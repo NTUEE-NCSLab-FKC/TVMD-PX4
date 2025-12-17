@@ -165,6 +165,7 @@ void ActuatorEffectivenessVTOL_TVMD::updateParams()
 		if (param_get(_param_handles.module_geometry[i].c_d, &_geometry.module_geometry[i].motor_conf(2)) != 0)
 		PX4_ERR("CAN NOT GET CD");
 
+		// motor rate: 1/s
 		_geometry.module_geometry[i].motor_conf(0) = 1.0f / _geometry.module_geometry[i].motor_conf(0);
 
 		// Servos
@@ -180,7 +181,7 @@ void ActuatorEffectivenessVTOL_TVMD::updateParams()
 			if (param_get(_param_handles.module_geometry[i].servo_max[j], &_geometry.module_geometry[i].servo_conf[j](2)) != 0) PX4_ERR("CAN NOT GET SERVI MAX");
 
 			// motor rate: 1/s
-			_geometry.module_geometry[i].motor_conf[j](0) = 1.0f / _geometry.module_geometry[i].motor_conf[j](0);
+			// _geometry.module_geometry[i].motor_conf[j](0) = 1.0f / _geometry.module_geometry[i].motor_conf[j](0);
 
 			// servo min
 			const float servo_min = math::radians(_geometry.module_geometry[i].servo_conf[j](1));
