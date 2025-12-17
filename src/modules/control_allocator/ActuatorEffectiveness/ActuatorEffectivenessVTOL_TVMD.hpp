@@ -74,7 +74,7 @@ public:
 	// region [Geometry Struct Definitions]
 	struct ModuleGeometry {
 		matrix::Vector3f position;
-		matrix::Vector3f motor_conf[2];
+		matrix::Vector3f motor_conf;	// one motor
 		matrix::Vector3f servo_conf[2];
 		uint8_t ax_psi;
 		float gear_ratio[2];
@@ -130,9 +130,9 @@ private:
 		param_t pos_z;
 		param_t ax_psi;
 
-		param_t c_l[2];
-		param_t c_d[2];
-		param_t motor_slew[2];   // propeller rate limit
+		param_t c_l;	// motor thrust coefficient
+		param_t c_d;	// motor drag coefficient
+		param_t motor_slew;   // propeller rate limit
 
 		param_t servo_min[2];  // eta_x servo angle min
 		param_t servo_max[2];  // eta_x servo angle max
