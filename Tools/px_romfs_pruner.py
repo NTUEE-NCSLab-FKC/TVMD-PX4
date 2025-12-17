@@ -115,7 +115,8 @@ def main():
                 # overwrite old scratch file
                 with open(file_path, "wb") as f:
                     pruned_content = re.sub("\r\n", "\n", pruned_content)
-                    f.write(pruned_content.encode("ascii", errors='strict'))
+                    # f.write(pruned_content.encode("ascii", errors='strict'))
+                    f.write(pruned_content.encode("utf-8", errors='strict'))
             else:
                 os.remove(file_path)
 

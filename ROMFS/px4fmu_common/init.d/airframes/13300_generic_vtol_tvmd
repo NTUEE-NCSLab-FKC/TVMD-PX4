@@ -1,28 +1,25 @@
 #!/bin/sh
 #
-# @name Generic VTOL TVMD
+# @name Generic VTOL TVMD : H-frame, 4x ducted fan + 8x tilting servos
 #
 # @type VTOL TVMD
 # @class VTOL
 #
 # @maintainer Sciyen <sciyen.ycc@gmail.com>
+# @maintainer FKC <d12921b11@ntu.edu.tw>
 #
-# @output Motor1 motor 1
-# @output Motor2 motor 2
-# @output Motor3 motor 3
-# @output Motor4 motor 4
-# @output Motor5 motor 5
-# @output Motor6 motor 6
-# @output Motor7 motor 7
-# @output Motor8 motor 8
-# @output Servo1 servo 1
-# @output Servo2 servo 2
-# @output Servo3 servo 3
-# @output Servo4 servo 4
-# @output Servo5 servo 5
-# @output Servo6 servo 6
-# @output Servo7 servo 7
-# @output Servo8 servo 8
+# @output Motor1 motor 1 (module 0, front-left, CW)
+# @output Motor2 motor 2 (module 1, front-right, CCW)
+# @output Motor3 motor 3 (module 2, rear-left, CCW)
+# @output Motor4 motor 4 (module 3, rear-right, CW)
+# @output Servo1 tilt servo 1 (module 0, X-axis)
+# @output Servo2 tilt servo 2 (module 0, Y-axis)
+# @output Servo3 tilt servo 3 (module 1, X-axis)
+# @output Servo4 tilt servo 4 (module 1, Y-axis)
+# @output Servo5 tilt servo 5 (module 2, X-axis)
+# @output Servo6 tilt servo 6 (module 2, Y-axis)
+# @output Servo7 tilt servo 7 (module 3, X-axis)
+# @output Servo8 tilt servo 8 (module 3, Y-axis)
 #
 
 . ${R}etc/init.d/rc.tvmd_defaults
@@ -51,137 +48,161 @@ param set-default CBRK_AIRSPD_CHK 162128
 param set-default COM_CPU_MAX -1
 
 
-# Module settings
+# Module settings - H-frame configuration (1.4kg, L=0.185m, W=0.16m)
+
 param set-default CA_MD_COUNT 4
 
-param set-default CA_MD0_PX 0.215
-param set-default CA_MD0_PY 0.215
+
+param set-default CA_MD0_PX 0.185      # Front-Left (changed from 0.215)
+param set-default CA_MD0_PY 0.16       # (changed from 0.215)
 param set-default CA_MD0_PZ 0
-param set-default CA_MD0_AZ 1
-param set-default CA_MD0_X_GR 1.0      ## 30 / 11, shaft = 30, motor = 11
+param set-default CA_MD0_AZ 0          # All modules same orientation (changed from 1)
+param set-default CA_MD0_X_GR 1.0
 param set-default CA_MD0_Y_GR 1.0
 
-param set-default CA_MD1_PX 0.215
-param set-default CA_MD1_PY -0.215
+
+param set-default CA_MD1_PX 0.185      # Front-Right (changed from 0.215)
+param set-default CA_MD1_PY -0.16      # (changed from -0.215)
 param set-default CA_MD1_PZ 0
-param set-default CA_MD1_AZ 1
+param set-default CA_MD1_AZ 0          # All modules same orientation (changed from 1)
 param set-default CA_MD1_X_GR 1.0
 param set-default CA_MD1_Y_GR 1.0
 
-param set-default CA_MD2_PX -0.215
-param set-default CA_MD2_PY 0.215
+
+param set-default CA_MD2_PX -0.185     # Rear-Left (changed from -0.215)
+param set-default CA_MD2_PY 0.16       # (changed from 0.215)
 param set-default CA_MD2_PZ 0
 param set-default CA_MD2_AZ 0
 param set-default CA_MD2_X_GR 1.0
 param set-default CA_MD2_Y_GR 1.0
 
-param set-default CA_MD3_PX -0.215
-param set-default CA_MD3_PY -0.215
-param set-default CA_MD3_PZ 0
+
+param set-default CA_MD3_PX -0.185     # Rear-Right (changed from -0.215)
+param set-default CA_MD3_PY -0.16      # (changed from -0.215)
 param set-default CA_MD3_AZ 0
 param set-default CA_MD3_X_GR 1.0
 param set-default CA_MD3_Y_GR 1.0
 
-# Rotor settins
-param set-default CA_ROTOR_COUNT 8
+# Rotor settings - Single propeller H-frame (4 motors, max 6N each)
 
-param set-default CA_ROTOR0_CT 0.020231
-param set-default CA_ROTOR0_KM -0.0188
+param set-default CA_ROTOR_COUNT 4     # Changed: 8 -> 4 (single prop per module)
+
+# Motor 0 (Module 0, Front-Left, CW)
+param set-default CA_ROTOR0_CT 0.012   # Changed: 0.020231 -> 0.012 (adjust after hover test)
+param set-default CA_ROTOR0_KM -0.0188 # CW rotation (correct)
 param set-default CA_ROTOR0_PX 0
 param set-default CA_ROTOR0_PY 0
-param set-default CA_ROTOR0_PZ 0.2
+param set-default CA_ROTOR0_PZ 0.0     # Changed: 0.2 -> 0.0 (single prop at module center)
 param set-default CA_ROTOR0_TILT 1
 
-param set-default CA_ROTOR1_CT 0.020231
-param set-default CA_ROTOR1_KM 0.0188
+
+# Motor 1 (Module 1, Front-Right, CCW)
+param set-default CA_ROTOR1_CT 0.012   # Changed: 0.020231 -> 0.012
+param set-default CA_ROTOR1_KM 0.0188  # CCW rotation (correct)
 param set-default CA_ROTOR1_PX 0
 param set-default CA_ROTOR1_PY 0
-param set-default CA_ROTOR1_PZ -0.2
+param set-default CA_ROTOR1_PZ 0.0     # Changed: -0.2 -> 0.0
 param set-default CA_ROTOR1_TILT 2
 
-param set-default CA_ROTOR2_CT 0.020231
-param set-default CA_ROTOR2_KM -0.0188
+
+
+# Motor 2 (Module 2, Rear-Left, CCW)
+param set-default CA_ROTOR2_CT 0.012   # Changed: 0.020231 -> 0.012
+param set-default CA_ROTOR2_KM 0.0188  # Changed: -0.0188 -> 0.0188 (CCW rotation)
 param set-default CA_ROTOR2_PX 0
 param set-default CA_ROTOR2_PY 0
-param set-default CA_ROTOR2_PZ 0.2
+param set-default CA_ROTOR2_PZ 0.0     # Changed: 0.2 -> 0.0
 param set-default CA_ROTOR2_TILT 3
 
-param set-default CA_ROTOR3_CT 0.020231
-param set-default CA_ROTOR3_KM 0.0188
+
+# Motor 3 (Module 3, Rear-Right, CW)
+param set-default CA_ROTOR3_CT 0.012   # Changed: 0.020231 -> 0.012
+param set-default CA_ROTOR3_KM -0.0188 # Changed: 0.0188 -> -0.0188 (CW rotation)
 param set-default CA_ROTOR3_PX 0
 param set-default CA_ROTOR3_PY 0
-param set-default CA_ROTOR3_PZ -0.2
+param set-default CA_ROTOR3_PZ 0.0     # Changed: -0.2 -> 0.0
 param set-default CA_ROTOR3_TILT 4
 
-param set-default CA_ROTOR4_CT 0.020231
-param set-default CA_ROTOR4_KM -0.0188
-param set-default CA_ROTOR4_PX 0
-param set-default CA_ROTOR4_PY 0
-param set-default CA_ROTOR4_PZ 0.2
-param set-default CA_ROTOR4_TILT 5
+# Deleted ROTOR4-7 (coaxial upper propellers not needed)
 
-param set-default CA_ROTOR5_CT 0.020231
-param set-default CA_ROTOR5_KM 0.0188
-param set-default CA_ROTOR5_PX 0
-param set-default CA_ROTOR5_PY 0
-param set-default CA_ROTOR5_PZ -0.2
-param set-default CA_ROTOR5_TILT 6
+# param set-default CA_ROTOR4_CT 0.020231
+# param set-default CA_ROTOR4_KM -0.0188
+# param set-default CA_ROTOR4_PX 0
+# param set-default CA_ROTOR4_PY 0
+# param set-default CA_ROTOR4_PZ 0.2
+# param set-default CA_ROTOR4_TILT 5
 
-param set-default CA_ROTOR6_CT 0.020231
-param set-default CA_ROTOR6_KM -0.0188
-param set-default CA_ROTOR6_PX 0
-param set-default CA_ROTOR6_PY 0
-param set-default CA_ROTOR6_PZ 0.2
-param set-default CA_ROTOR6_TILT 7
+# param set-default CA_ROTOR5_CT 0.020231
+# param set-default CA_ROTOR5_KM 0.0188
+# param set-default CA_ROTOR5_PX 0
+# param set-default CA_ROTOR5_PY 0
+# param set-default CA_ROTOR5_PZ -0.2
+# param set-default CA_ROTOR5_TILT 6
 
-param set-default CA_ROTOR7_CT 0.020231
-param set-default CA_ROTOR7_KM 0.0188
-param set-default CA_ROTOR7_PX 0
-param set-default CA_ROTOR7_PY 0
-param set-default CA_ROTOR7_PZ -0.2
-param set-default CA_ROTOR7_TILT 8
+# param set-default CA_ROTOR6_CT 0.020231
+# param set-default CA_ROTOR6_KM -0.0188
+# param set-default CA_ROTOR6_PX 0
+# param set-default CA_ROTOR6_PY 0
+# param set-default CA_ROTOR6_PZ 0.2
+# param set-default CA_ROTOR6_TILT 7
 
-# Tilting servos
+# param set-default CA_ROTOR7_CT 0.020231
+# param set-default CA_ROTOR7_KM 0.0188
+# param set-default CA_ROTOR7_PX 0
+# param set-default CA_ROTOR7_PY 0
+# param set-default CA_ROTOR7_PZ -0.2
+# param set-default CA_ROTOR7_TILT 8
+
+# Tilting servos - All ±45° configuration (circular cone LAFS)
+
 param set-default CA_SV_TL_COUNT 8
 
-param set-default CA_SV_TL0_MINA -20
-param set-default CA_SV_TL0_MAXA 20
-param set-default CA_SV_TL0_TD 0
+
+param set-default CA_SV_TL0_MINA -45   # Changed: -20 -> -45
+param set-default CA_SV_TL0_MAXA 45    # Changed: 20 -> 45
+param set-default CA_SV_TL0_TD 0       # X-axis tilt
 param set-default CA_SV_TL0_CT 1
+
 
 param set-default CA_SV_TL1_MINA -45
 param set-default CA_SV_TL1_MAXA 45
-param set-default CA_SV_TL1_TD 90
+param set-default CA_SV_TL1_TD 90      # Y-axis tilt
 param set-default CA_SV_TL1_CT 1
 
-param set-default CA_SV_TL2_MINA -20
-param set-default CA_SV_TL2_MAXA 20
-param set-default CA_SV_TL2_TD 0
+
+param set-default CA_SV_TL2_MINA -45   # Changed: -20 -> -45
+param set-default CA_SV_TL2_MAXA 45    # Changed: 20 -> 45
+param set-default CA_SV_TL2_TD 0       # X-axis tilt
 param set-default CA_SV_TL2_CT 1
+
 
 param set-default CA_SV_TL3_MINA -45
 param set-default CA_SV_TL3_MAXA 45
-param set-default CA_SV_TL3_TD 90
+param set-default CA_SV_TL3_TD 90      # Y-axis tilt
 param set-default CA_SV_TL3_CT 1
 
-param set-default CA_SV_TL4_MINA -20
-param set-default CA_SV_TL4_MAXA 20
-param set-default CA_SV_TL4_TD 0
+
+param set-default CA_SV_TL4_MINA -45   # Changed: -20 -> -45
+param set-default CA_SV_TL4_MAXA 45    # Changed: 20 -> 45
+param set-default CA_SV_TL4_TD 0       # X-axis tilt
 param set-default CA_SV_TL4_CT 1
+
 
 param set-default CA_SV_TL5_MINA -45
 param set-default CA_SV_TL5_MAXA 45
-param set-default CA_SV_TL5_TD 90
+param set-default CA_SV_TL5_TD 90      # Y-axis tilt
 param set-default CA_SV_TL5_CT 1
 
-param set-default CA_SV_TL6_MINA -20
-param set-default CA_SV_TL6_MAXA 20
-param set-default CA_SV_TL6_TD 0
+
+param set-default CA_SV_TL6_MINA -45   # Changed: -20 -> -45
+param set-default CA_SV_TL6_MAXA 45    # Changed: 20 -> 45
+param set-default CA_SV_TL6_TD 0       # X-axis tilt
 param set-default CA_SV_TL6_CT 1
+
 
 param set-default CA_SV_TL7_MINA -45
 param set-default CA_SV_TL7_MAXA 45
-param set-default CA_SV_TL7_TD 90
+param set-default CA_SV_TL7_TD 90      # Y-axis tilt
 param set-default CA_SV_TL7_CT 1
 
 # Others
@@ -190,103 +211,229 @@ param set-default CA_SV_TL7_CT 1
 # param set-default VT_ELEV_MC_LOCK 0
 # param set-default VT_B_TRANS_DUR 5
 
-param set-default PWM_MAIN_FUNC1 10003
-param set-default PWM_MAIN_FUNC2 10004
-param set-default PWM_MAIN_FUNC3 10005
-param set-default PWM_MAIN_FUNC4 10006
+# param set-default PWM_MAIN_FUNC1 10003
+# param set-default PWM_MAIN_FUNC2 10004
+# param set-default PWM_MAIN_FUNC3 10005
+# param set-default PWM_MAIN_FUNC4 10006
+
+###############################################################################
+
+#                    PWM Output Configuration (New)                          #
+
+###############################################################################
+
+###############################################################################
+#                    PWM Output Configuration                                 #
+###############################################################################
+
+# Motor PWM configuration - MAIN OUT 1-4
+
+param set-default PWM_MAIN_FUNC1 101   # Motor 1 (Module 0)
+param set-default PWM_MAIN_FUNC2 102   # Motor 2 (Module 1)
+param set-default PWM_MAIN_FUNC3 103   # Motor 3 (Module 2)
+param set-default PWM_MAIN_FUNC4 104   # Motor 4 (Module 3)
 
 
-param set-default I2C_OUT_EN 1
-param set-default I2C_SV_REV 170         ## Reverse servo direction of 2, 4, 6, 8
 
-param set-default I2C_EC_FUNC1 102
-param set-default I2C_EC_FUNC2 101
-param set-default I2C_EC_FUNC3 104
-param set-default I2C_EC_FUNC4 103
-param set-default I2C_EC_FUNC5 106
-param set-default I2C_EC_FUNC6 105
-param set-default I2C_EC_FUNC7 108
-param set-default I2C_EC_FUNC8 107
+param set-default PWM_MAIN_MIN1 1000
+param set-default PWM_MAIN_MIN2 1000
+param set-default PWM_MAIN_MIN3 1000
+param set-default PWM_MAIN_MIN4 1000
 
-param set-default I2C_SV_FUNC1 201
-param set-default I2C_SV_FUNC2 202
-param set-default I2C_SV_FUNC3 203
-param set-default I2C_SV_FUNC4 204
-param set-default I2C_SV_FUNC5 205
-param set-default I2C_SV_FUNC6 206
-param set-default I2C_SV_FUNC7 207
-param set-default I2C_SV_FUNC8 208
 
-param set-default I2C_EC_MIN1 1000
-param set-default I2C_EC_MIN2 1000
-param set-default I2C_EC_MIN3 1000
-param set-default I2C_EC_MIN4 1000
-param set-default I2C_EC_MIN5 1000
-param set-default I2C_EC_MIN6 1000
-param set-default I2C_EC_MIN7 1000
-param set-default I2C_EC_MIN8 1000
 
-param set-default I2C_EC_MAX1 2000
-param set-default I2C_EC_MAX2 2000
-param set-default I2C_EC_MAX3 2000
-param set-default I2C_EC_MAX4 2000
-param set-default I2C_EC_MAX5 2000
-param set-default I2C_EC_MAX6 2000
-param set-default I2C_EC_MAX7 2000
-param set-default I2C_EC_MAX8 2000
+param set-default PWM_MAIN_MAX1 2000
+param set-default PWM_MAIN_MAX2 2000
+param set-default PWM_MAIN_MAX3 2000
+param set-default PWM_MAIN_MAX4 2000
 
-param set-default I2C_EC_DIS1 1000
-param set-default I2C_EC_DIS2 1000
-param set-default I2C_EC_DIS3 1000
-param set-default I2C_EC_DIS4 1000
-param set-default I2C_EC_DIS5 1000
-param set-default I2C_EC_DIS6 1000
-param set-default I2C_EC_DIS7 1000
-param set-default I2C_EC_DIS8 1000
 
-param set-default I2C_EC_FAIL1 -1
-param set-default I2C_EC_FAIL2 -1
-param set-default I2C_EC_FAIL3 -1
-param set-default I2C_EC_FAIL4 -1
-param set-default I2C_EC_FAIL5 -1
-param set-default I2C_EC_FAIL6 -1
-param set-default I2C_EC_FAIL7 -1
-param set-default I2C_EC_FAIL8 -1
 
-param set-default I2C_SV_MIN1 1052
-param set-default I2C_SV_MIN2 900
-param set-default I2C_SV_MIN3 800
-param set-default I2C_SV_MIN4 900
-param set-default I2C_SV_MIN5 800
-param set-default I2C_SV_MIN6 900
-param set-default I2C_SV_MIN7 1010
-param set-default I2C_SV_MIN8 900
+param set-default PWM_MAIN_DIS1 1000
+param set-default PWM_MAIN_DIS2 1000
+param set-default PWM_MAIN_DIS3 1000
+param set-default PWM_MAIN_DIS4 1000
 
-param set-default I2C_SV_MAX1 2200
-param set-default I2C_SV_MAX2 2100
-param set-default I2C_SV_MAX3 1990
-param set-default I2C_SV_MAX4 2100
-param set-default I2C_SV_MAX5 1990
-param set-default I2C_SV_MAX6 2100
-param set-default I2C_SV_MAX7 2200
-param set-default I2C_SV_MAX8 2100
 
-param set-default I2C_SV_DIS1 1626
-param set-default I2C_SV_DIS2 1500
-param set-default I2C_SV_DIS3 1395
-param set-default I2C_SV_DIS4 1500
-param set-default I2C_SV_DIS5 1395
-param set-default I2C_SV_DIS6 1500
-param set-default I2C_SV_DIS7 1605
-param set-default I2C_SV_DIS8 1500
 
-param set-default I2C_SV_FAIL1 -1
-param set-default I2C_SV_FAIL2 -1
-param set-default I2C_SV_FAIL3 -1
-param set-default I2C_SV_FAIL4 -1
-param set-default I2C_SV_FAIL5 -1
-param set-default I2C_SV_FAIL6 -1
-param set-default I2C_SV_FAIL7 -1
-param set-default I2C_SV_FAIL8 -1
+param set-default PWM_MAIN_RATE 400    # 400Hz for ESC
+
+
+
+# Servo PWM configuration - AUX OUT 1-8
+
+param set-default PWM_AUX_FUNC1 201    # Tilt Servo 1 (Module 0, X-axis)
+param set-default PWM_AUX_FUNC2 202    # Tilt Servo 2 (Module 0, Y-axis)
+param set-default PWM_AUX_FUNC3 203    # Tilt Servo 3 (Module 1, X-axis)
+param set-default PWM_AUX_FUNC4 204    # Tilt Servo 4 (Module 1, Y-axis)
+param set-default PWM_AUX_FUNC5 205    # Tilt Servo 5 (Module 2, X-axis)
+param set-default PWM_AUX_FUNC6 206    # Tilt Servo 6 (Module 2, Y-axis)
+param set-default PWM_AUX_FUNC7 207    # Tilt Servo 7 (Module 3, X-axis)
+param set-default PWM_AUX_FUNC8 208    # Tilt Servo 8 (Module 3, Y-axis)
+
+
+
+# Servo PWM calibration - ADJUST THESE VALUES BASED ON YOUR SERVOS
+
+param set-default PWM_AUX_MIN1 1000
+param set-default PWM_AUX_MIN2 1000
+param set-default PWM_AUX_MIN3 1000
+param set-default PWM_AUX_MIN4 1000
+param set-default PWM_AUX_MIN5 1000
+param set-default PWM_AUX_MIN6 1000
+param set-default PWM_AUX_MIN7 1000
+param set-default PWM_AUX_MIN8 1000
+
+
+
+param set-default PWM_AUX_MAX1 2000
+param set-default PWM_AUX_MAX2 2000
+param set-default PWM_AUX_MAX3 2000
+param set-default PWM_AUX_MAX4 2000
+param set-default PWM_AUX_MAX5 2000
+param set-default PWM_AUX_MAX6 2000
+param set-default PWM_AUX_MAX7 2000
+param set-default PWM_AUX_MAX8 2000
+
+
+
+param set-default PWM_AUX_DIS1 1500    # Center position (0°)
+param set-default PWM_AUX_DIS2 1500
+param set-default PWM_AUX_DIS3 1500
+param set-default PWM_AUX_DIS4 1500
+param set-default PWM_AUX_DIS5 1500
+param set-default PWM_AUX_DIS6 1500
+param set-default PWM_AUX_DIS7 1500
+param set-default PWM_AUX_DIS8 1500
+
+
+param set-default PWM_AUX_RATE 50      # 50Hz for standard servo
+
+# # Motor configuration - MAIN OUT (motor 1-4)
+# param set-default PWM_MAIN_FUNC1 101  # Motor 1
+# param set-default PWM_MAIN_FUNC2 102  # Motor 2
+# param set-default PWM_MAIN_FUNC3 103  # Motor 3
+# param set-default PWM_MAIN_FUNC4 104  # Motor 4
+
+# param set-default PWM_MAIN_MIN 1000
+# param set-default PWM_MAIN_MAX 2000
+# param set-default PWM_MAIN_DISARMED 1000
+# param set-default PWM_MAIN_RATE 400    # 400Hz
+
+# # Servo configuration - AUX OUT (servo 1-8)
+# param set-default PWM_AUX_FUNC1 201
+# param set-default PWM_AUX_FUNC2 202
+# param set-default PWM_AUX_FUNC3 203
+# param set-default PWM_AUX_FUNC4 204
+# param set-default PWM_AUX_FUNC5 205
+# param set-default PWM_AUX_FUNC6 206
+# param set-default PWM_AUX_FUNC7 207
+# param set-default PWM_AUX_FUNC8 208
+
+# param set-default PWM_AUX_MIN 1000     # Calibrated for servo
+# param set-default PWM_AUX_MAX 2000
+# param set-default PWM_AUX_DISARMED 1500  # Center position
+# param set-default PWM_AUX_RATE 50      # 50Hz standard servo frequency
+
+
+###############################################################################
+
+#          I2C Configuration (Disabled - kept for reference)                 #
+
+###############################################################################
+
+
+# param set-default I2C_OUT_EN 1
+# param set-default I2C_SV_REV 170         ## Reverse servo direction of 2, 4, 6, 8
+
+# param set-default I2C_EC_FUNC1 102
+# param set-default I2C_EC_FUNC2 101
+# param set-default I2C_EC_FUNC3 104
+# param set-default I2C_EC_FUNC4 103
+# param set-default I2C_EC_FUNC5 106
+# param set-default I2C_EC_FUNC6 105
+# param set-default I2C_EC_FUNC7 108
+# param set-default I2C_EC_FUNC8 107
+
+# param set-default I2C_SV_FUNC1 201
+# param set-default I2C_SV_FUNC2 202
+# param set-default I2C_SV_FUNC3 203
+# param set-default I2C_SV_FUNC4 204
+# param set-default I2C_SV_FUNC5 205
+# param set-default I2C_SV_FUNC6 206
+# param set-default I2C_SV_FUNC7 207
+# param set-default I2C_SV_FUNC8 208
+
+# param set-default I2C_EC_MIN1 1000
+# param set-default I2C_EC_MIN2 1000
+# param set-default I2C_EC_MIN3 1000
+# param set-default I2C_EC_MIN4 1000
+# param set-default I2C_EC_MIN5 1000
+# param set-default I2C_EC_MIN6 1000
+# param set-default I2C_EC_MIN7 1000
+# param set-default I2C_EC_MIN8 1000
+
+# param set-default I2C_EC_MAX1 2000
+# param set-default I2C_EC_MAX2 2000
+# param set-default I2C_EC_MAX3 2000
+# param set-default I2C_EC_MAX4 2000
+# param set-default I2C_EC_MAX5 2000
+# param set-default I2C_EC_MAX6 2000
+# param set-default I2C_EC_MAX7 2000
+# param set-default I2C_EC_MAX8 2000
+
+# param set-default I2C_EC_DIS1 1000
+# param set-default I2C_EC_DIS2 1000
+# param set-default I2C_EC_DIS3 1000
+# param set-default I2C_EC_DIS4 1000
+# param set-default I2C_EC_DIS5 1000
+# param set-default I2C_EC_DIS6 1000
+# param set-default I2C_EC_DIS7 1000
+# param set-default I2C_EC_DIS8 1000
+
+# param set-default I2C_EC_FAIL1 -1
+# param set-default I2C_EC_FAIL2 -1
+# param set-default I2C_EC_FAIL3 -1
+# param set-default I2C_EC_FAIL4 -1
+# param set-default I2C_EC_FAIL5 -1
+# param set-default I2C_EC_FAIL6 -1
+# param set-default I2C_EC_FAIL7 -1
+# param set-default I2C_EC_FAIL8 -1
+
+# param set-default I2C_SV_MIN1 1052
+# param set-default I2C_SV_MIN2 900
+# param set-default I2C_SV_MIN3 800
+# param set-default I2C_SV_MIN4 900
+# param set-default I2C_SV_MIN5 800
+# param set-default I2C_SV_MIN6 900
+# param set-default I2C_SV_MIN7 1010
+# param set-default I2C_SV_MIN8 900
+
+# param set-default I2C_SV_MAX1 2200
+# param set-default I2C_SV_MAX2 2100
+# param set-default I2C_SV_MAX3 1990
+# param set-default I2C_SV_MAX4 2100
+# param set-default I2C_SV_MAX5 1990
+# param set-default I2C_SV_MAX6 2100
+# param set-default I2C_SV_MAX7 2200
+# param set-default I2C_SV_MAX8 2100
+
+# param set-default I2C_SV_DIS1 1626
+# param set-default I2C_SV_DIS2 1500
+# param set-default I2C_SV_DIS3 1395
+# param set-default I2C_SV_DIS4 1500
+# param set-default I2C_SV_DIS5 1395
+# param set-default I2C_SV_DIS6 1500
+# param set-default I2C_SV_DIS7 1605
+# param set-default I2C_SV_DIS8 1500
+
+# param set-default I2C_SV_FAIL1 -1
+# param set-default I2C_SV_FAIL2 -1
+# param set-default I2C_SV_FAIL3 -1
+# param set-default I2C_SV_FAIL4 -1
+# param set-default I2C_SV_FAIL5 -1
+# param set-default I2C_SV_FAIL6 -1
+# param set-default I2C_SV_FAIL7 -1
+# param set-default I2C_SV_FAIL8 -1
 
 

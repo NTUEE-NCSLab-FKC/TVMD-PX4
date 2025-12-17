@@ -37,6 +37,7 @@
  * Actuator effectiveness for VTOL TVMD
  *
  * @author Yen-Cheng Chu <sciyen.ycc@gmail.com>
+ * @author FKC <d12921b11@ntu.edu.tw>
  */
 
 #pragma once
@@ -106,9 +107,13 @@ public:
 
 	// void getUnallocatedControl(int matrix_index, control_allocator_status_s &status) override;
 
-	void tf_inverse_mapping(const uint8_t module_id, const matrix::Vector2f &tftd, matrix::Vector2f &u_prop) const;
+	// void tf_inverse_mapping(const uint8_t module_id, const matrix::Vector2f &tftd, matrix::Vector2f &u_prop) const;
 
-	void tf_mapping(const uint8_t module_id, matrix::Vector2f &tftd, const matrix::Vector2f &u_prop) const;
+	// void tf_mapping(const uint8_t module_id, matrix::Vector2f &tftd, const matrix::Vector2f &u_prop) const;
+
+	// Single propeller mapping functions (changed from Vector2f to float)
+	void tf_inverse_mapping(const uint8_t module_id, const float tftd, float &u_prop) const;
+	void tf_mapping(const uint8_t module_id, float &tftd, const float u_prop) const;
 
 protected:
 
@@ -157,6 +162,10 @@ private:
 	bool _armed{false};
 	uint64_t _armed_time{0};
 
-	inline uint8_t get_motor_idx(uint8_t module_id, uint8_t offset) { return 2 * module_id + offset; };
-	inline uint8_t get_servo_idx(uint8_t module_id, uint8_t offset) { return 2 * module_id + offset + 2 * _geometry.num_agents; };
+	// inline uint8_t get_motor_idx(uint8_t module_id, uint8_t offset) { return 2 * module_id + offset; };
+	// inline uint8_t get_servo_idx(uint8_t module_id, uint8_t offset) { return 2 * module_id + offset + 2 * _geometry.num_agents; };
+
+	// Single propeller configuration: one motor per module (changed from dual-prop)
+	inline uint8_t get_motor_idx(uint8_t module_id, uint8_t offset) { return module_id; };	// return for motor0~3
+	inline uint8_t get_servo_idx(uint8_t module_id, uint8_t offset) { return 2 * module_id + offset + _geometry.num_agents; }; // return for servo0_x, servo0_y, servo1_x, servo1_y, ...
 };
