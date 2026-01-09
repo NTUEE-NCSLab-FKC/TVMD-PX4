@@ -278,3 +278,25 @@ PARAM_DEFINE_INT32(SYS_BL_UPDATE, 0);
  * @group System
  */
 PARAM_DEFINE_INT32(SYS_FAILURE_EN, 0);
+
+/**
+
+ * Number of airspeed sensors
+
+ *
+
+ * The number of airspeed sensors on the vehicle.
+
+ * Disable the check with 0.
+
+ *
+
+ * @group System
+
+ * @min 0
+
+ * @max 3
+
+ */
+
+PARAM_DEFINE_INT32(SYS_HAS_NUM_ASPD, 0);

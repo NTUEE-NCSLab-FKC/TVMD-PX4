@@ -98,7 +98,7 @@ PARAM_DEFINE_FLOAT(PFA_GAIN_Z_D, 2.00f);
  * @group PFA Position Control
  * @decimal 3
  */
-PARAM_DEFINE_FLOAT(PFA_VEH_MASS, 3.058f);
+PARAM_DEFINE_FLOAT(PFA_VEH_MASS, 1.400f);
 
 /**
  * Maximum thrust of the vechicle in Newton
@@ -106,7 +106,7 @@ PARAM_DEFINE_FLOAT(PFA_VEH_MASS, 3.058f);
  * @group PFA Position Control
  * @decimal 2
  */
-PARAM_DEFINE_FLOAT(PFA_MAX_THR, 49.09f);
+PARAM_DEFINE_FLOAT(PFA_MAX_THR, 24.00f);
 
 /**
  * Bypassing takeoff process (takeoff immediately after arming)

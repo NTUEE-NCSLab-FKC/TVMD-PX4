@@ -33,16 +33,42 @@ param set-default CA_METHOD 3
 
 
 ## General Settings
-param set-default SENS_BOARD_ROT 20     ## FCU direction: ROTATION_ROLL_270
 
-param set-default EKF2_EV_CTRL 11       ## Enable external vision in EKF2
-param set-default EKF2_BARO_CTRL 0      ## We trust vision feedback
+param set-default SENS_BOARD_ROT 0     ## FCU direction
+
+## Optical Flow Configuration (MTF-01P with rangefinder)
+param set-default EKF2_OF_CTRL 1        ## Enable optical flow fusion
+param set-default EKF2_RNG_CTRL 1       ## Enable rangefinder height fusion
+param set-default EKF2_BARO_CTRL 1      ## Enable barometer for altitude
+param set-default EKF2_HGT_REF 2        ## Use rangefinder as primary height reference
+param set-default EKF2_EV_CTRL 0        ## Disable external vision
+
+## Rangefinder settings
+param set-default EKF2_RNG_AID 1        ## Enable rangefinder aided velocity estimation
+param set-default EKF2_RNG_A_VMAX 1.0   ## Max velocity for rangefinder aiding (m/s)
+param set-default EKF2_RNG_A_HMAX 8.0   ## Max height for rangefinder aiding (m)
+param set-default EKF2_RNG_DELAY 5      ## Rangefinder measurement delay (ms)
+param set-default EKF2_OF_DELAY 5       ## Optical flow measurement delay (ms)
+
+## GPS and indoor settings
+
+param set-default EKF2_GPS_CTRL 0       ## Disable GPS (indoor testing)
+param set-default COM_ARM_WO_GPS 1      ## Allow arming without GPS
+
+## MAVLink configuration for TELEM 2
 param set-default MAV_1_CONFIG 102      ## TELEM 2
-param set-default MAV_1_MODE 8          ## EXTERNAL VISION
+param set-default MAV_1_MODE 0          ## Normal (not external vision)
+param set-default MAV_1_RATE 0          ## Use default rates
 
-param set-default COM_DISARM_PRFLT 600  ## 10 minutes before force disarming (for debugging)
-param set-default COM_POWER_COUNT 0     ## We only have one power source
-param set-default BAT1_N_CELLS 4
+
+# param set-default EKF2_EV_CTRL 11       ## Enable external vision in EKF2
+# param set-default EKF2_BARO_CTRL 0      ## We trust vision feedback
+# param set-default MAV_1_CONFIG 102      ## TELEM 2
+# param set-default MAV_1_MODE 8          ## EXTERNAL VISION
+
+# param set-default COM_DISARM_PRFLT 600  ## 10 minutes before force disarming (for debugging)
+# param set-default COM_POWER_COUNT 0     ## We only have one power source
+# param set-default BAT1_N_CELLS 4
 
 param set-default CBRK_AIRSPD_CHK 162128
 param set-default COM_CPU_MAX -1
@@ -93,7 +119,7 @@ param set-default CA_ROTOR0_KM -0.0188 # CW rotation (correct)
 param set-default CA_ROTOR0_PX 0
 param set-default CA_ROTOR0_PY 0
 param set-default CA_ROTOR0_PZ 0.0     # Changed: 0.2 -> 0.0 (single prop at module center)
-param set-default CA_ROTOR0_TILT 1
+# param set-default CA_ROTOR0_TILT 1
 
 
 # Motor 1 (Module 1, Front-Right, CCW)
@@ -102,7 +128,7 @@ param set-default CA_ROTOR1_KM 0.0188  # CCW rotation (correct)
 param set-default CA_ROTOR1_PX 0
 param set-default CA_ROTOR1_PY 0
 param set-default CA_ROTOR1_PZ 0.0     # Changed: -0.2 -> 0.0
-param set-default CA_ROTOR1_TILT 2
+# param set-default CA_ROTOR1_TILT 2
 
 
 
@@ -112,7 +138,7 @@ param set-default CA_ROTOR2_KM 0.0188  # Changed: -0.0188 -> 0.0188 (CCW rotatio
 param set-default CA_ROTOR2_PX 0
 param set-default CA_ROTOR2_PY 0
 param set-default CA_ROTOR2_PZ 0.0     # Changed: 0.2 -> 0.0
-param set-default CA_ROTOR2_TILT 3
+# param set-default CA_ROTOR2_TILT 3
 
 
 # Motor 3 (Module 3, Rear-Right, CW)
@@ -121,7 +147,7 @@ param set-default CA_ROTOR3_KM -0.0188 # Changed: 0.0188 -> -0.0188 (CW rotation
 param set-default CA_ROTOR3_PX 0
 param set-default CA_ROTOR3_PY 0
 param set-default CA_ROTOR3_PZ 0.0     # Changed: -0.2 -> 0.0
-param set-default CA_ROTOR3_TILT 4
+# param set-default CA_ROTOR3_TILT 4
 
 # Deleted ROTOR4-7 (coaxial upper propellers not needed)
 
@@ -232,6 +258,10 @@ param set-default PWM_MAIN_FUNC1 101   # Motor 1 (Module 0)
 param set-default PWM_MAIN_FUNC2 102   # Motor 2 (Module 1)
 param set-default PWM_MAIN_FUNC3 103   # Motor 3 (Module 2)
 param set-default PWM_MAIN_FUNC4 104   # Motor 4 (Module 3)
+param set-default PWM_MAIN_FUNC5 0     # Disabled (no motor 5)
+param set-default PWM_MAIN_FUNC6 0     # Disabled (no motor 6)
+param set-default PWM_MAIN_FUNC7 0     # Disabled (no motor 7)
+param set-default PWM_MAIN_FUNC8 0     # Disabled (no motor 8)
 
 
 
