@@ -38,10 +38,10 @@
  *
  *
  * @author Yen-Cheng Chu <sciyen.ycc@gmail.com>
+ * @author FKC <d12921b11@ntu.edu.tw>
  */
 
-#include "ControlAllocationEBRCA.hpp"
-
+ #include "ControlAllocationEBRCA.hpp"
 ControlAllocationEBRCA::ControlAllocationEBRCA()
 {
 	printf("It's EBRCA running\n");
@@ -135,7 +135,7 @@ ControlAllocationEBRCA::calcualte_bundled_pseudo_inverse(ControlVector &u_in)
 
 	const matrix::Vector<float, NUM_AXES>  allocated_raw = _eff * _f;
 	allocated_raw.copyTo(_meta_data.allocated_control);
-	
+
 	#ifdef CA_EBRCA_DEBUGGER
 	const matrix::Vector<float, NUM_AXES>  allocated = getAllocatedControl();
 	printf("allocation complete\n");
@@ -145,15 +145,243 @@ ControlAllocationEBRCA::calcualte_bundled_pseudo_inverse(ControlVector &u_in)
 	#endif // CA_EBRCA_DEBUGGER
 
 	// Post Torque Enhancement
+	// #ifdef CA_EBRCA_ENABLE_PBP
+	// if (full_rank) {
+	// 	if (c < 1) {
+	// 	}
+	// }
+	// #endif // CA_EBRCA_ENABLE_PBP
+
+	// Post Torque Enhancement | Internal Force Optimizer (IFO) via nullspace projection
 	#ifdef CA_EBRCA_ENABLE_PBP
-	if (full_rank) {
-		if (c < 1) {
+	if (full_rank && (c >= 0.0f)) {
+		// Only apply PTE if allocation is nearly complete and we still have full rank , c=0.0f means full-time activation
+		#ifdef CA_EBRCA_DEBUGGER
+		printf("\n========== Applying PTE (Nullspace Projection + Scaling) ==========\n");
+		const matrix::Vector<float, NUM_AXES> u_before = _eff * _f;
+		printf("Before PTE - Wrench error: %.6f\n", (double)(u_before - u_in).norm());
+		#endif
+
+		// Design inward tilt target configuration
+		PseudoForceVector f_desired_tilt;
+		const float target_tilt_angle_deg = 15.0f;  // 15 degrees inward tilt
+		design_inward_tilt_pte(_f, f_desired_tilt, target_tilt_angle_deg);
+
+		// Apply nullspace projection and scaling
+		PseudoForceVector f_enhanced;
+		float k_scaling = 0.0f;
+		const bool pte_success = solve_pte_with_projection_scaling(_f, f_desired_tilt, f_enhanced, k_scaling);
+
+		if (pte_success && k_scaling > 0.01f) {
+			// Verify wrench preservation
+			const matrix::Vector<float, NUM_AXES> u_enhanced = _eff * f_enhanced;
+			const float wrench_error = (u_enhanced - u_in).norm();
+
+			if (wrench_error < 1e-3f) {
+				// Accept PTE enhancement
+				_f = f_enhanced;
+
+				#ifdef CA_EBRCA_DEBUGGER
+				printf("✓ PTE applied successfully (k=%.4f)\n", (double)k_scaling);
+				printf("  After PTE - Wrench error: %.6f\n", (double)wrench_error);
+				#endif
+			} else {
+				#ifdef CA_EBRCA_DEBUGGER
+				printf("✗ PTE rejected due to wrench error: %.6f\n", (double)wrench_error);
+				#endif
+			}
+		} else {
+			#ifdef CA_EBRCA_DEBUGGER
+			printf("✗ PTE not applied (k=%.4f, success=%d)\n", (double)k_scaling, pte_success);
+			#endif
 		}
+
+		#ifdef CA_EBRCA_DEBUGGER
+		printf("===================================================================\n\n");
+		#endif
 	}
 	#endif // CA_EBRCA_ENABLE_PBP
 
 	_control_allocation_meta_data_pub.publish(_meta_data);
 }
+
+
+void
+ControlAllocationEBRCA::design_inward_tilt_pte(
+	const PseudoForceVector &f_current,
+	PseudoForceVector &f_desired_tilt,
+	const float tilt_angle_deg)
+{
+	const float tilt_angle_rad = tilt_angle_deg * M_PI_F / 180.0f;
+
+	// Initialize output
+	f_desired_tilt = f_current;
+
+	for (uint8_t i = 0; i < NUM_MODULES; i++) {
+		// Extract current pseudo force for this module
+		const matrix::Vector3f f_i = f_current.slice<3, 1>(3*i, 0);
+
+		// Get current thrust magnitude
+		matrix::Vector3f raw;
+		inverse_transform(raw, f_i);
+		const float tf_curr = f_i.norm();
+
+		// Extract thruster position from effectiveness matrix
+		// The thrust force column gives us Rz, from torque we can extract position
+		// For simplicity, extract from effectiveness matrix structure
+		// _eff(3:6, 3*i:3*i+2) = Rz, where Rz = [cos(psi), -sin(psi), 0; sin(psi), cos(psi), 0; 0, 0, 1]
+
+		// Get the rotation matrix Rz from the force effectiveness (rows 3-5, columns 3*i to 3*i+2)
+		const matrix::Matrix3f Rz = _eff.slice<3, 3>(3, 3*i);
+
+		// Extract psi (yaw angle) from Rz
+		const float psi = atan2f(Rz(1, 0), Rz(0, 0));  // psi = atan2(sin(psi), cos(psi))
+
+		// Extract position from torque effectiveness
+		// _eff(0:3, 3*i:3*i+2) = position.hat() * Rz
+		// For fz component: _eff(0:3, 3*i+2) = position.hat() * [0; 0; 1] after rotation
+		const matrix::Vector3f torque_col_z = _eff.slice<3, 1>(0, 3*i+2);
+
+		// position.hat() * Rz * [0; 0; 1] = position.hat() * Rz_col3
+		// where Rz_col3 = [0; 0; 1] (third column of Rz)
+		// This gives us: [pos_y; -pos_x; 0] (approximately, need to account for rotation)
+
+		// Simplified approach: Extract position from the cross product relationship
+		// torque = position x force
+		// For vertical thrust (fz), torque_xy comes from position_xy
+		const matrix::Vector3f Rz_col3 = Rz.slice<3, 1>(0, 2);  // Third column of Rz
+
+		// Reconstruct position using the inverse of the hat operator
+		// If torque = pos.hat() * force_direction, then:
+		// [tx; ty; tz] = [pos_y*fz - pos_z*fy; pos_z*fx - pos_x*fz; pos_x*fy - pos_y*fx]
+		// For Rz_col3 = [0; 0; 1], we get: [pos_y; -pos_x; 0]
+
+		float pos_x, pos_y;
+		if (fabsf(Rz_col3(2)) > 0.1f) {  // Vertical component exists
+			pos_y = torque_col_z(0) / Rz_col3(2);
+			pos_x = -torque_col_z(1) / Rz_col3(2);
+		} else {
+			// Fallback: use another column
+			const matrix::Vector3f Rz_col1 = Rz.slice<3, 1>(0, 0);
+			const matrix::Vector3f torque_col_x = _eff.slice<3, 1>(0, 3*i);
+			pos_y = torque_col_x(0) / Rz_col1(2);
+			pos_x = -torque_col_x(1) / Rz_col1(2);
+		}
+
+		// Calculate inward direction in body frame
+		const float pos_xy_norm = sqrtf(pos_x * pos_x + pos_y * pos_y);
+
+		if (pos_xy_norm > 1e-6f) {
+			// Inward direction (pointing toward center)
+			const float inward_body_x = -pos_x / pos_xy_norm;
+			const float inward_body_y = -pos_y / pos_xy_norm;
+
+			// Transform to thruster frame
+			const float cos_psi = cosf(psi);
+			const float sin_psi = sinf(psi);
+			const float inward_thruster_x = cos_psi * inward_body_x + sin_psi * inward_body_y;
+			const float inward_thruster_y = -sin_psi * inward_body_x + cos_psi * inward_body_y;
+
+			// Set target tilt angles (tilting inward)
+			float target_alpha = -copysignf(tilt_angle_rad, inward_thruster_y);
+			float target_beta = copysignf(tilt_angle_rad, inward_thruster_x);
+
+			// Clamp to limits
+			target_alpha = math::constrain(target_alpha, -sigma_eta[0], sigma_eta[0]);
+			target_beta = math::constrain(target_beta, -sigma_eta[1], sigma_eta[1]);
+
+			// Compute desired pseudo force with target tilt angles
+			const float fx_desired = sinf(target_beta) * tf_curr;
+			const float fy_desired = -sinf(target_alpha) * cosf(target_beta) * tf_curr;
+			const float fz_desired = cosf(target_alpha) * cosf(target_beta) * tf_curr;
+
+			f_desired_tilt(3*i + 0) = fx_desired;
+			f_desired_tilt(3*i + 1) = fy_desired;
+			f_desired_tilt(3*i + 2) = fz_desired;
+
+			#ifdef CA_EBRCA_DEBUGGER
+			printf("Module %d: pos=(%.3f, %.3f), psi=%.1f deg, inward_thr=(%.3f, %.3f), alpha=%.1f deg, beta=%.1f deg\n",
+				i, (double)pos_x, (double)pos_y, (double)(psi * 180.0f / M_PI_F),
+				(double)inward_thruster_x, (double)inward_thruster_y,
+				(double)(target_alpha * 180.0f / M_PI_F), (double)(target_beta * 180.0f / M_PI_F));
+			#endif
+		}
+	}
+}
+
+bool
+ControlAllocationEBRCA::solve_pte_with_projection_scaling(
+	const PseudoForceVector &f_current,
+	const PseudoForceVector &f_desired_tilt,
+	PseudoForceVector &f_enhanced,
+	float &k_scaling)
+{
+	// Compute pseudo-inverse of effectiveness matrix
+	// Using SVD-based pseudo-inverse for numerical stability
+	const matrix::Matrix<float, NUM_F, NUM_AXES> M_pinv = matrix::geninv(_eff);
+
+	// Compute direction vector in pseudo-force space
+	const PseudoForceVector f_diff = f_desired_tilt - f_current;
+
+	// Compute wrench difference
+	const ControlVector u_diff = _eff * f_diff;
+
+	// Compute nullspace projection: v_proj = f_diff - M_pinv * u_diff
+	// This projects f_diff onto the nullspace of the effectiveness matrix
+	const PseudoForceVector v_proj = f_diff - M_pinv * u_diff;
+
+	// Check if projection has meaningful magnitude
+	const float v_proj_norm = v_proj.norm();
+	if (v_proj_norm < _epsilon) {
+		// No nullspace component, PTE cannot be applied
+		f_enhanced = f_current;
+		k_scaling = 0.0f;
+		return false;
+	}
+
+	// Compute maximum scaling factor that doesn't violate constraints
+	// Use calc_saturated_agent_id to find the boundary intersection
+	int8_t saturated_agent = -1;
+	const PseudoForceVector f_probe = f_current + v_proj;
+	const float d = calc_saturated_agent_id(saturated_agent, f_current, f_probe);
+
+	// Limit scaling factor to [0, 1]
+	k_scaling = math::min(d, 1.0f);
+
+	if (k_scaling < _epsilon) {
+		// Cannot apply PTE without violating constraints
+		f_enhanced = f_current;
+		return false;
+	}
+
+	// Apply enhancement
+	f_enhanced = f_current + k_scaling * v_proj;
+
+	// Verify that the wrench is preserved (should be within numerical tolerance)
+	const ControlVector u_current = _eff * f_current;
+	const ControlVector u_enhanced = _eff * f_enhanced;
+	const float wrench_error = (u_enhanced - u_current).norm();
+
+	#ifdef CA_EBRCA_DEBUGGER
+	printf("  PTE scaling factor k=%.4f\n", (double)k_scaling);
+	printf("  Nullspace projection norm: %.6f\n", (double)v_proj_norm);
+	printf("  Wrench preservation error: %.6f\n", (double)wrench_error);
+	if (saturated_agent >= 0 && k_scaling < 1.0f) {
+		printf("  Limited by module %d\n", saturated_agent);
+	}
+	#endif
+
+	// Check if wrench error is acceptable
+	if (wrench_error > 1e-3f) {
+		// Wrench preservation violated, reject PTE
+		f_enhanced = f_current;
+		k_scaling = 0.0f;
+		return false;
+	}
+
+	return true;
+}
+
 
 /**
  * Solve the maximum increment from f0 to the local admissible boundary

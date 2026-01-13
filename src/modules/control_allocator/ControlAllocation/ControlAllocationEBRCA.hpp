@@ -38,6 +38,7 @@
  *
  *
  * @author Yen-Cheng Chu <sciyen.ycc@gmail.com>
+ * @author FKC <d12921b11@ntu.edu.tw>
  */
 
 #pragma once
@@ -50,7 +51,7 @@
 #include <uORB/topics/control_allocation_meta_data.h>
 
 // #define CA_EBRCA_DEBUGGER
-// #define CA_EBRCA_ENABLE_PBP
+#define CA_EBRCA_ENABLE_PBP
 
 class ControlAllocationEBRCA: public ControlAllocationModularBundled
 {
@@ -81,6 +82,18 @@ private:
 	inline float check_negative(const float &x) const {
 		return (x < 0.0f) ? INFINITY : x;
 	}
+
+	// PTE (Post-Torque Enhancement) related functions | Internal Force Optimizer (IFO) via nullspace projection
+	void design_inward_tilt_pte(
+		const PseudoForceVector &f_current,
+		PseudoForceVector &f_desired_tilt,
+		const float tilt_angle_deg);
+
+	bool solve_pte_with_projection_scaling(
+		const PseudoForceVector &f_current,
+		const PseudoForceVector &f_desired_tilt,
+		PseudoForceVector &f_enhanced,
+		float &k_scaling);
 
 	control_allocation_meta_data_s _meta_data;
 	uint8_t _iter{0};
