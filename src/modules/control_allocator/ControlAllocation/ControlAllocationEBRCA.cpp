@@ -326,12 +326,13 @@ ControlAllocationEBRCA::solve_pte_with_projection_scaling(
 	// const matrix::Matrix<float, NUM_F, NUM_AXES> M_pinv = matrix::geninv(_eff);
 
 	// Pseudo-inverse
-	matrix::SquareMatrix<float, NUM_AXES> BBT = _eff * _eff.transpose(); // B * B^T
-	for (int i = 0; i < NUM_AXES; i++) { // Tikhonov Regularization
-    		BBT(i, i) += 1e-4f;
+	matrix::SquareMatrix<float, NUM_AXES> MMT = _eff * _eff.transpose(); // M * M^T
+	// Tikhonov Regularization
+	for (int i = 0; i < NUM_AXES; i++) {
+    		MMT(i, i) += 1e-4f;
 	}
-	matrix::SquareMatrix<float, NUM_AXES> BBT_inv = matrix::inv(BBT); // (B * B^T)^-1
-	const matrix::Matrix<float, NUM_F, NUM_AXES> M_pinv = _eff.transpose() * BBT_inv; // B^T * (B * B^T)^-1
+	matrix::SquareMatrix<float, NUM_AXES> MMT_inv = matrix::inv(MMT); // (M * M^T)^-1
+	const matrix::Matrix<float, NUM_F, NUM_AXES> M_pinv = _eff.transpose() * MMT_inv; // M^T * (M * M^T)^-1
 
 	// Compute direction vector in pseudo-force space
 	const PseudoForceVector f_diff = f_desired_tilt - f_current;
