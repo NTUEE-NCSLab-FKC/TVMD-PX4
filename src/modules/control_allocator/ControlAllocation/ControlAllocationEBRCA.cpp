@@ -289,8 +289,11 @@ ControlAllocationEBRCA::design_inward_tilt_pte(
 			float target_beta = copysignf(tilt_angle_rad, inward_thruster_x);
 
 			// Clamp to limits
-			target_alpha = math::constrain(target_alpha, -sigma_eta[0], sigma_eta[0]);
-			target_beta = math::constrain(target_beta, -sigma_eta[1], sigma_eta[1]);
+			// target_alpha = math::constrain(target_alpha, -sigma_eta[0], sigma_eta[0]);
+			// target_beta = math::constrain(target_beta, -sigma_eta[1], sigma_eta[1]);
+
+			target_alpha = fmaxf(-sigma_eta[0], fminf(target_alpha, sigma_eta[0]));
+			target_beta = fmaxf(-sigma_eta[1], fminf(target_beta, sigma_eta[1]));
 
 			// Compute desired pseudo force with target tilt angles
 			const float fx_desired = sinf(target_beta) * tf_curr;
@@ -348,7 +351,7 @@ ControlAllocationEBRCA::solve_pte_with_projection_scaling(
 	const float d = calc_saturated_agent_id(saturated_agent, f_current, f_probe);
 
 	// Limit scaling factor to [0, 1]
-	k_scaling = math::min(d, 1.0f);
+	k_scaling = fminf(d, 1.0f);
 
 	if (k_scaling < _epsilon) {
 		// Cannot apply PTE without violating constraints
