@@ -323,7 +323,15 @@ ControlAllocationEBRCA::solve_pte_with_projection_scaling(
 {
 	// Compute pseudo-inverse of effectiveness matrix
 	// Using SVD-based pseudo-inverse for numerical stability
-	const matrix::Matrix<float, NUM_F, NUM_AXES> M_pinv = matrix::geninv(_eff);
+	// const matrix::Matrix<float, NUM_F, NUM_AXES> M_pinv = matrix::geninv(_eff);
+
+	// Pseudo-inverse
+	matrix::SquareMatrix<float, NUM_AXES> BBT = _eff * _eff.transpose(); // B * B^T
+	for (int i = 0; i < NUM_AXES; i++) { // Tikhonov Regularization
+    		BBT(i, i) += 1e-4f;
+	}
+	matrix::SquareMatrix<float, NUM_AXES> BBT_inv = matrix::inv(BBT); // (B * B^T)^-1
+	const matrix::Matrix<float, NUM_F, NUM_AXES> M_pinv = _eff.transpose() * BBT_inv; // B^T * (B * B^T)^-1
 
 	// Compute direction vector in pseudo-force space
 	const PseudoForceVector f_diff = f_desired_tilt - f_current;
