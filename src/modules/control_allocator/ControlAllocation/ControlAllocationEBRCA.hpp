@@ -51,7 +51,7 @@
 #include <uORB/topics/control_allocation_meta_data.h>
 
 // #define CA_EBRCA_DEBUGGER
-#define CA_EBRCA_ENABLE_PBP
+#define CA_EBRCA_ENABLE_PBP // Post Boundary Protection (PBP) , for PTE
 
 class ControlAllocationEBRCA: public ControlAllocationModularBundled
 {

@@ -41,7 +41,7 @@
  * @author FKC <d12921b11@ntu.edu.tw>
  */
 
- #include "ControlAllocationEBRCA.hpp"
+#include "ControlAllocationEBRCA.hpp"
 ControlAllocationEBRCA::ControlAllocationEBRCA()
 {
 	printf("It's EBRCA running\n");
@@ -159,7 +159,8 @@ ControlAllocationEBRCA::calcualte_bundled_pseudo_inverse(ControlVector &u_in)
 		#ifdef CA_EBRCA_DEBUGGER
 		printf("\n========== Applying PTE (Nullspace Projection + Scaling) ==========\n");
 		const matrix::Vector<float, NUM_AXES> u_before = _eff * _f;
-		printf("Before PTE - Wrench error: %.6f\n", (double)(u_before - u_in).norm());
+		const float wrench_error_before = sqrtf(u_diff_before.dot(u_diff_before));
+		printf("Before PTE - Wrench error: %.6f\n", (double)wrench_error_before);
 		#endif
 
 		// Design inward tilt target configuration
@@ -175,7 +176,8 @@ ControlAllocationEBRCA::calcualte_bundled_pseudo_inverse(ControlVector &u_in)
 		if (pte_success && k_scaling > 0.01f) {
 			// Verify wrench preservation
 			const matrix::Vector<float, NUM_AXES> u_enhanced = _eff * f_enhanced;
-			const float wrench_error = (u_enhanced - u_in).norm();
+			const ControlVector wrench_diff = u_enhanced - u_in;
+			const float wrench_error = sqrtf(wrench_diff.dot(wrench_diff));
 
 			if (wrench_error < 1e-3f) {
 				// Accept PTE enhancement
@@ -331,7 +333,7 @@ ControlAllocationEBRCA::solve_pte_with_projection_scaling(
 	const PseudoForceVector v_proj = f_diff - M_pinv * u_diff;
 
 	// Check if projection has meaningful magnitude
-	const float v_proj_norm = v_proj.norm();
+	const float v_proj_norm = sqrtf(v_proj.dot(v_proj));
 	if (v_proj_norm < _epsilon) {
 		// No nullspace component, PTE cannot be applied
 		f_enhanced = f_current;
@@ -360,7 +362,8 @@ ControlAllocationEBRCA::solve_pte_with_projection_scaling(
 	// Verify that the wrench is preserved (should be within numerical tolerance)
 	const ControlVector u_current = _eff * f_current;
 	const ControlVector u_enhanced = _eff * f_enhanced;
-	const float wrench_error = (u_enhanced - u_current).norm();
+	const ControlVector wrench_diff = u_enhanced - u_current;
+	const float wrench_error = sqrtf(wrench_diff.dot(wrench_diff));
 
 	#ifdef CA_EBRCA_DEBUGGER
 	printf("  PTE scaling factor k=%.4f\n", (double)k_scaling);
