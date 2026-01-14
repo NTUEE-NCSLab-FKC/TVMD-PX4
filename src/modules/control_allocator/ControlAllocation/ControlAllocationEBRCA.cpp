@@ -159,6 +159,7 @@ ControlAllocationEBRCA::calcualte_bundled_pseudo_inverse(ControlVector &u_in)
 		#ifdef CA_EBRCA_DEBUGGER
 		printf("\n========== Applying PTE (Nullspace Projection + Scaling) ==========\n");
 		const matrix::Vector<float, NUM_AXES> u_before = _eff * _f;
+		const ControlVector u_diff_before = u_before - u_in;
 		const float wrench_error_before = sqrtf(u_diff_before.dot(u_diff_before));
 		printf("Before PTE - Wrench error: %.6f\n", (double)wrench_error_before);
 		#endif
