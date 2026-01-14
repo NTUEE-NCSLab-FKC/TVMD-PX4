@@ -38,6 +38,7 @@
  *
  *
  * @author Yen-Cheng Chu <sciyen.ycc@gmail.com>
+ * @author FKC <d12921b11@ntu.edu.tw>
  */
 
 #include "ControlAllocationModularBundled.hpp"
@@ -281,10 +282,11 @@ void ControlAllocationModularBundled::generate_actuator_sp(const PseudoForceVect
 		const matrix::Vector3f f_i( pseudo_force.slice<3, 1>(3*i, 0) );
 		inverse_transform(raw, f_i);
 
-		const uint8_t motor_idx = 2*i;
+		// const uint8_t motor_idx = 2*i;
+		const uint8_t motor_idx = i; // change to 1 motor per module
 		const uint8_t eta_idx = _actuator_idx_offset + 2*i;
 		_actuator_sp(motor_idx  ) = raw(2);  // Tf    (N)
-		_actuator_sp(motor_idx+1) = 0;       // Td    (Nm)
+		// _actuator_sp(motor_idx+1) = 0;    // Td    (Nm)
 		_actuator_sp(eta_idx  )   = raw(0);  // eta_x (rad)
 		_actuator_sp(eta_idx+1)   = raw(1);  // eta_y (rad)
 	}

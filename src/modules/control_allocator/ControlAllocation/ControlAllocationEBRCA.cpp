@@ -184,6 +184,8 @@ ControlAllocationEBRCA::calcualte_bundled_pseudo_inverse(ControlVector &u_in)
 				// Accept PTE enhancement
 				_f = f_enhanced;
 
+				_meta_data.increment[NUM_MODULES - 1] = k_scaling;
+
 				#ifdef CA_EBRCA_DEBUGGER
 				printf("✓ PTE applied successfully (k=%.4f)\n", (double)k_scaling);
 				printf("  After PTE - Wrench error: %.6f\n", (double)wrench_error);
