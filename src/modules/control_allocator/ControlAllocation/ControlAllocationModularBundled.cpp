@@ -283,8 +283,9 @@ void ControlAllocationModularBundled::generate_actuator_sp(const PseudoForceVect
 		inverse_transform(raw, f_i);
 
 		// const uint8_t motor_idx = 2*i;
+		// const uint8_t eta_idx = _actuator_idx_offset + 2*i;
 		const uint8_t motor_idx = i; // change to 1 motor per module
-		const uint8_t eta_idx = _actuator_idx_offset + 2*i;
+		const uint8_t eta_idx = NUM_MODULES + 2*i;  // offset = 4
 		_actuator_sp(motor_idx  ) = raw(2);  // Tf    (N)
 		// _actuator_sp(motor_idx+1) = 0;    // Td    (Nm)
 		_actuator_sp(eta_idx  )   = raw(0);  // eta_x (rad)

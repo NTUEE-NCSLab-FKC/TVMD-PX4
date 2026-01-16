@@ -169,7 +169,8 @@ protected:
 #endif // CA_MB_DEBUGGER
 
 private:
-	const uint8_t _actuator_idx_offset{NUM_MODULES * 2};
+	// const uint8_t _actuator_idx_offset{NUM_MODULES * 2};
+	const uint8_t _actuator_idx_offset{NUM_MODULES}; // change to 1 motor per module
 
 	// void normalizeControlAllocationMatrix();
 	// void updateControlAllocationMatrixScale();
