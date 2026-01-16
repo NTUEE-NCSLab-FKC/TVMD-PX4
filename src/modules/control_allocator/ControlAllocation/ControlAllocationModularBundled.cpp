@@ -281,12 +281,15 @@ void ControlAllocationModularBundled::generate_actuator_sp(const PseudoForceVect
 		const matrix::Vector3f f_i( pseudo_force.slice<3, 1>(3*i, 0) );
 		inverse_transform(raw, f_i);
 
-		const uint8_t motor_idx = 2*i;
-		const uint8_t eta_idx = _actuator_idx_offset + 2*i;
-		_actuator_sp(motor_idx  ) = raw(2);  // Tf    (N)
-		_actuator_sp(motor_idx+1) = 0;       // Td    (Nm)
-		_actuator_sp(eta_idx  )   = raw(0);  // eta_x (rad)
-		_actuator_sp(eta_idx+1)   = raw(1);  // eta_y (rad)
+		// Fixed actuator index mapping to match ActuatorEffectivenessVTOL_TVMD
+		// Motors: 0, 1, 2, 3 (consecutive)
+		// Servos: 4, 5, 6, 7, 8, 9, 10, 11 (consecutive)
+		const uint8_t motor_idx = i;              // Motor index: 0, 1, 2, 3
+		const uint8_t eta_idx = NUM_MODULES + 2*i; // Servo index: 4, 6, 8, 10
+
+		_actuator_sp(motor_idx) = raw(2);     // Tf    (N)
+		_actuator_sp(eta_idx  ) = raw(0);     // eta_x (rad)
+		_actuator_sp(eta_idx+1) = raw(1);     // eta_y (rad)
 	}
 
 	// Warning: The post-modification in actuator effectiveness will not affect the inner state.
