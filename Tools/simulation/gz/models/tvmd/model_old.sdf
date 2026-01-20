@@ -71,7 +71,7 @@
         </material>
       </visual>
       <visual name='base_link_fixed_joint_lump__module1_body_link_visual_2'>
-        <pose>0.185 0.16 0 0 0 1.5707963267948959</pose>
+        <pose>0.215 0.215 0 0 0 1.5707963267948959</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -88,7 +88,7 @@
         </material>
       </visual>
       <visual name='base_link_fixed_joint_lump__module2_body_link_visual_3'>
-        <pose>0.185 -0.16 0 0 0 1.5707963267948959</pose>
+        <pose>0.215 -0.215 0 0 0 1.5707963267948959</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -105,7 +105,7 @@
         </material>
       </visual>
       <visual name='base_link_fixed_joint_lump__module3_body_link_visual_4'>
-        <pose>-0.185 0.16 0 0 0 0</pose>
+        <pose>-0.215 0.215 0 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -122,7 +122,7 @@
         </material>
       </visual>
       <visual name='base_link_fixed_joint_lump__module4_body_link_visual_5'>
-        <pose>-0.185 -0.16 0 0 0 0</pose>
+        <pose>-0.215 -0.215 0 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -163,7 +163,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module1_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.185 0.16 0.068000000000000005 0 0 1.5707963267948959</pose>
+      <pose relative_to='base_link'>0.215 0.215 0.068000000000000005 0 0 1.5707963267948959</pose>
       <parent>base_link</parent>
       <child>module1_gimbal_link</child>
       <axis>
@@ -232,8 +232,8 @@
       <axis>
         <xyz>1 0 0</xyz>
         <limit>
-          <lower>-0.78539816339744828</lower>
-          <upper>0.78539816339744828</upper>
+          <lower>-0.52359877559829882</lower>
+          <upper>0.52359877559829882</upper>
           <effort>30000</effort>
           <velocity>10</velocity>
         </limit>
@@ -280,7 +280,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module1_actuator_prop1_joint' type='revolute'>
-      <pose relative_to='module1_actuator_link'>0 0 0 0 0 0</pose>
+      <pose relative_to='module1_actuator_link'>0 0 0.078100000000000003 0 0 0</pose>
       <parent>module1_actuator_link</parent>
       <child>module1_prop1_link</child>
       <axis>
@@ -340,8 +340,69 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <joint name='module1_actuator_prop2_joint' type='revolute'>
+      <pose relative_to='module1_actuator_link'>0 0 -0.078100000000000003 0 0 0</pose>
+      <parent>module1_actuator_link</parent>
+      <child>module1_prop2_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <limit>
+          <effort>30000</effort>
+          <velocity>10000</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module1_prop2_link'>
+      <pose relative_to='module1_actuator_prop2_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.0025377799999999999</mass>
+        <inertia>
+          <ixx>7.0199999999999997e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.9999999999999998e-08</iyy>
+          <iyz>-8.9999999999999999e-08</iyz>
+          <izz>7.0500000000000003e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='module1_prop2_link_fixed_joint_lump__module1_rotor_2_collision_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.0050000000000000001</length>
+            <radius>0.12</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module1_prop2_link_visual'>
+        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Propeller_9047.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Yellow</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 0 1</diffuse>
+          <ambient>1 1 0 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
     <joint name='module2_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.185 -0.16 0.068000000000000005 0 0 1.5707963267948959</pose>
+      <pose relative_to='base_link'>0.215 -0.215 0.068000000000000005 0 0 1.5707963267948959</pose>
       <parent>base_link</parent>
       <child>module2_gimbal_link</child>
       <axis>
@@ -410,8 +471,8 @@
       <axis>
         <xyz>1 0 0</xyz>
         <limit>
-          <lower>-0.78539816339744828</lower>
-          <upper>0.78539816339744828</upper>
+          <lower>-0.52359877559829882</lower>
+          <upper>0.52359877559829882</upper>
           <effort>30000</effort>
           <velocity>10</velocity>
         </limit>
@@ -458,7 +519,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module2_actuator_prop1_joint' type='revolute'>
-      <pose relative_to='module2_actuator_link'>0 0 0 0 0 0</pose>
+      <pose relative_to='module2_actuator_link'>0 0 0.078100000000000003 0 0 0</pose>
       <parent>module2_actuator_link</parent>
       <child>module2_prop1_link</child>
       <axis>
@@ -518,8 +579,69 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <joint name='module2_actuator_prop2_joint' type='revolute'>
+      <pose relative_to='module2_actuator_link'>0 0 -0.078100000000000003 0 0 0</pose>
+      <parent>module2_actuator_link</parent>
+      <child>module2_prop2_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <limit>
+          <effort>30000</effort>
+          <velocity>10000</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module2_prop2_link'>
+      <pose relative_to='module2_actuator_prop2_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.0025377799999999999</mass>
+        <inertia>
+          <ixx>7.0199999999999997e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.9999999999999998e-08</iyy>
+          <iyz>-8.9999999999999999e-08</iyz>
+          <izz>7.0500000000000003e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='module2_prop2_link_fixed_joint_lump__module2_rotor_2_collision_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.0050000000000000001</length>
+            <radius>0.12</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module2_prop2_link_visual'>
+        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Propeller_9047.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Yellow</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 0 1</diffuse>
+          <ambient>1 1 0 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
     <joint name='module3_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.185 0.16 0.068000000000000005 0 0 0</pose>
+      <pose relative_to='base_link'>-0.215 0.215 0.068000000000000005 0 0 0</pose>
       <parent>base_link</parent>
       <child>module3_gimbal_link</child>
       <axis>
@@ -588,8 +710,8 @@
       <axis>
         <xyz>1 0 0</xyz>
         <limit>
-          <lower>-0.78539816339744828</lower>
-          <upper>0.78539816339744828</upper>
+          <lower>-0.52359877559829882</lower>
+          <upper>0.52359877559829882</upper>
           <effort>30000</effort>
           <velocity>10</velocity>
         </limit>
@@ -636,7 +758,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module3_actuator_prop1_joint' type='revolute'>
-      <pose relative_to='module3_actuator_link'>0 0 0 0 0 0</pose>
+      <pose relative_to='module3_actuator_link'>0 0 0.078100000000000003 0 0 0</pose>
       <parent>module3_actuator_link</parent>
       <child>module3_prop1_link</child>
       <axis>
@@ -696,8 +818,69 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <joint name='module3_actuator_prop2_joint' type='revolute'>
+      <pose relative_to='module3_actuator_link'>0 0 -0.078100000000000003 0 0 0</pose>
+      <parent>module3_actuator_link</parent>
+      <child>module3_prop2_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <limit>
+          <effort>30000</effort>
+          <velocity>10000</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module3_prop2_link'>
+      <pose relative_to='module3_actuator_prop2_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.0025377799999999999</mass>
+        <inertia>
+          <ixx>7.0199999999999997e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.9999999999999998e-08</iyy>
+          <iyz>-8.9999999999999999e-08</iyz>
+          <izz>7.0500000000000003e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='module3_prop2_link_fixed_joint_lump__module3_rotor_2_collision_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.0050000000000000001</length>
+            <radius>0.12</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module3_prop2_link_visual'>
+        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Propeller_9047.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Yellow</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 0 1</diffuse>
+          <ambient>1 1 0 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
     <joint name='module4_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.185 -0.16 0.068000000000000005 0 0 0</pose>
+      <pose relative_to='base_link'>-0.215 -0.215 0.068000000000000005 0 0 0</pose>
       <parent>base_link</parent>
       <child>module4_gimbal_link</child>
       <axis>
@@ -766,8 +949,8 @@
       <axis>
         <xyz>1 0 0</xyz>
         <limit>
-          <lower>-0.78539816339744828</lower>
-          <upper>0.78539816339744828</upper>
+          <lower>-0.52359877559829882</lower>
+          <upper>0.52359877559829882</upper>
           <effort>30000</effort>
           <velocity>10</velocity>
         </limit>
@@ -814,7 +997,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module4_actuator_prop1_joint' type='revolute'>
-      <pose relative_to='module4_actuator_link'>0 0 0 0 0 0</pose>
+      <pose relative_to='module4_actuator_link'>0 0 0.078100000000000003 0 0 0</pose>
       <parent>module4_actuator_link</parent>
       <child>module4_prop1_link</child>
       <axis>
@@ -874,6 +1057,67 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <joint name='module4_actuator_prop2_joint' type='revolute'>
+      <pose relative_to='module4_actuator_link'>0 0 -0.078100000000000003 0 0 0</pose>
+      <parent>module4_actuator_link</parent>
+      <child>module4_prop2_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <limit>
+          <effort>30000</effort>
+          <velocity>10000</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module4_prop2_link'>
+      <pose relative_to='module4_actuator_prop2_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.0025377799999999999</mass>
+        <inertia>
+          <ixx>7.0199999999999997e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.9999999999999998e-08</iyy>
+          <iyz>-8.9999999999999999e-08</iyz>
+          <izz>7.0500000000000003e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='module4_prop2_link_fixed_joint_lump__module4_rotor_2_collision_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.0050000000000000001</length>
+            <radius>0.12</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module4_prop2_link_visual'>
+        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Propeller_9047.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Yellow</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 0 1</diffuse>
+          <ambient>1 1 0 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
     <plugin name='gz::sim::systems::JointPositionController' filename='gz-sim-joint-position-controller-system'>
       <joint_name>module1_body_gimbal_joint</joint_name>
       <sub_topic>servo_1</sub_topic>
@@ -885,7 +1129,7 @@
     <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
       <jointName>module1_actuator_prop1_joint</jointName>
       <linkName>module1_prop1_link</linkName>
-      <turningDirection>cw</turningDirection>
+      <turningDirection>ccw</turningDirection>
       <timeConstantUp>0.0125</timeConstantUp>
       <timeConstantDown>0.025</timeConstantDown>
       <maxRotVelocity>1500</maxRotVelocity>
@@ -893,6 +1137,22 @@
       <momentConstant>0.06</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>0</motorNumber>
+      <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+      <jointName>module1_actuator_prop2_joint</jointName>
+      <linkName>module1_prop2_link</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>1500</maxRotVelocity>
+      <motorConstant>2e-05</motorConstant>
+      <momentConstant>0.06</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>1</motorNumber>
       <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
       <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
       <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
@@ -916,7 +1176,23 @@
       <motorConstant>2e-05</motorConstant>
       <momentConstant>0.06</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
-      <motorNumber>1</motorNumber>
+      <motorNumber>2</motorNumber>
+      <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+      <jointName>module2_actuator_prop2_joint</jointName>
+      <linkName>module2_prop2_link</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>1500</maxRotVelocity>
+      <motorConstant>2e-05</motorConstant>
+      <momentConstant>0.06</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>3</motorNumber>
       <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
       <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
       <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
@@ -940,7 +1216,23 @@
       <motorConstant>2e-05</motorConstant>
       <momentConstant>0.06</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
-      <motorNumber>2</motorNumber>
+      <motorNumber>4</motorNumber>
+      <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+      <jointName>module3_actuator_prop2_joint</jointName>
+      <linkName>module3_prop2_link</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>1500</maxRotVelocity>
+      <motorConstant>2e-05</motorConstant>
+      <momentConstant>0.06</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>5</motorNumber>
       <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
       <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
       <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
@@ -957,14 +1249,30 @@
     <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
       <jointName>module4_actuator_prop1_joint</jointName>
       <linkName>module4_prop1_link</linkName>
-      <turningDirection>cw</turningDirection>
+      <turningDirection>ccw</turningDirection>
       <timeConstantUp>0.0125</timeConstantUp>
       <timeConstantDown>0.025</timeConstantDown>
       <maxRotVelocity>1500</maxRotVelocity>
       <motorConstant>2e-05</motorConstant>
       <momentConstant>0.06</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
-      <motorNumber>3</motorNumber>
+      <motorNumber>6</motorNumber>
+      <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+      <jointName>module4_actuator_prop2_joint</jointName>
+      <linkName>module4_prop2_link</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>1500</maxRotVelocity>
+      <motorConstant>2e-05</motorConstant>
+      <momentConstant>0.06</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>7</motorNumber>
       <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
       <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
       <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
@@ -977,25 +1285,25 @@
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module1_body_link' attached_to='base_link'>
-      <pose>0.185 0.16 0 0 0 1.5707963267948959</pose>
+      <pose>0.215 0.215 0 0 0 1.5707963267948959</pose>
     </frame>
     <frame name='module1_body_link' attached_to='rigid_base_link_module1_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module2_body_link' attached_to='base_link'>
-      <pose>0.185 -0.16 0 0 0 1.5707963267948959</pose>
+      <pose>0.215 -0.215 0 0 0 1.5707963267948959</pose>
     </frame>
     <frame name='module2_body_link' attached_to='rigid_base_link_module2_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module3_body_link' attached_to='base_link'>
-      <pose>-0.185 0.16 0 0 0 0</pose>
+      <pose>-0.215 0.215 0 0 0 0</pose>
     </frame>
     <frame name='module3_body_link' attached_to='rigid_base_link_module3_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module4_body_link' attached_to='base_link'>
-      <pose>-0.185 -0.16 0 0 0 0</pose>
+      <pose>-0.215 -0.215 0 0 0 0</pose>
     </frame>
     <frame name='module4_body_link' attached_to='rigid_base_link_module4_body_link'>
       <pose>0 0 0 0 0 0</pose>

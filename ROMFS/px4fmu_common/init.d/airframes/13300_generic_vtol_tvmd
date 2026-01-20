@@ -38,7 +38,7 @@ param set-default SENS_BOARD_ROT 0     ## FCU direction
 
 ## Optical Flow Configuration (MTF-01P with rangefinder)
 param set-default EKF2_OF_CTRL 1        ## Enable optical flow fusion
-param set-default EKF2_RNG_CTRL 1       ## Enable rangefinder height fusion
+param set-default EKF2_RNG_CTRL 2       ## Enable rangefinder height fusion
 param set-default EKF2_BARO_CTRL 1      ## Enable barometer for altitude
 param set-default EKF2_HGT_REF 2        ## Use rangefinder as primary height reference
 param set-default EKF2_EV_CTRL 0        ## Disable external vision
@@ -184,50 +184,50 @@ param set-default CA_ROTOR3_PZ 0.0     # Changed: -0.2 -> 0.0
 param set-default CA_SV_TL_COUNT 8
 
 
-param set-default CA_SV_TL0_MINA -45   # Changed: -20 -> -45
-param set-default CA_SV_TL0_MAXA 45    # Changed: 20 -> 45
+param set-default CA_SV_TL0_MINA -30   # Changed: -20 -> -30
+param set-default CA_SV_TL0_MAXA 30    # Changed: 20 -> 30
 param set-default CA_SV_TL0_TD 0       # X-axis tilt
 param set-default CA_SV_TL0_CT 1
 
 
-param set-default CA_SV_TL1_MINA -45
-param set-default CA_SV_TL1_MAXA 45
+param set-default CA_SV_TL1_MINA -30
+param set-default CA_SV_TL1_MAXA 30
 param set-default CA_SV_TL1_TD 90      # Y-axis tilt
 param set-default CA_SV_TL1_CT 1
 
 
-param set-default CA_SV_TL2_MINA -45   # Changed: -20 -> -45
-param set-default CA_SV_TL2_MAXA 45    # Changed: 20 -> 45
+param set-default CA_SV_TL2_MINA -30   # Changed: -20 -> -30
+param set-default CA_SV_TL2_MAXA 30    # Changed: 20 -> 30
 param set-default CA_SV_TL2_TD 0       # X-axis tilt
 param set-default CA_SV_TL2_CT 1
 
 
-param set-default CA_SV_TL3_MINA -45
-param set-default CA_SV_TL3_MAXA 45
+param set-default CA_SV_TL3_MINA -30
+param set-default CA_SV_TL3_MAXA 30
 param set-default CA_SV_TL3_TD 90      # Y-axis tilt
 param set-default CA_SV_TL3_CT 1
 
 
-param set-default CA_SV_TL4_MINA -45   # Changed: -20 -> -45
-param set-default CA_SV_TL4_MAXA 45    # Changed: 20 -> 45
+param set-default CA_SV_TL4_MINA -30   # Changed: -20 -> -30
+param set-default CA_SV_TL4_MAXA 30    # Changed: 20 -> 30
 param set-default CA_SV_TL4_TD 0       # X-axis tilt
 param set-default CA_SV_TL4_CT 1
 
 
-param set-default CA_SV_TL5_MINA -45
-param set-default CA_SV_TL5_MAXA 45
+param set-default CA_SV_TL5_MINA -30
+param set-default CA_SV_TL5_MAXA 30
 param set-default CA_SV_TL5_TD 90      # Y-axis tilt
 param set-default CA_SV_TL5_CT 1
 
 
-param set-default CA_SV_TL6_MINA -45   # Changed: -20 -> -45
-param set-default CA_SV_TL6_MAXA 45    # Changed: 20 -> 45
+param set-default CA_SV_TL6_MINA -30   # Changed: -20 -> -30
+param set-default CA_SV_TL6_MAXA 30    # Changed: 20 -> 30
 param set-default CA_SV_TL6_TD 0       # X-axis tilt
 param set-default CA_SV_TL6_CT 1
 
 
-param set-default CA_SV_TL7_MINA -45
-param set-default CA_SV_TL7_MAXA 45
+param set-default CA_SV_TL7_MINA -30
+param set-default CA_SV_TL7_MAXA 30
 param set-default CA_SV_TL7_TD 90      # Y-axis tilt
 param set-default CA_SV_TL7_CT 1
 

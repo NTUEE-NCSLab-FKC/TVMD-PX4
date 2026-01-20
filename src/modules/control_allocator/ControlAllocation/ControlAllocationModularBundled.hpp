@@ -170,6 +170,7 @@ protected:
 
 private:
 	// const uint8_t _actuator_idx_offset{NUM_MODULES * 2};
+	// Offset for servo actuators after motors (4 motors, then servos start at index 4)
 	const uint8_t _actuator_idx_offset{NUM_MODULES}; // change to 1 motor per module
 
 	// void normalizeControlAllocationMatrix();
