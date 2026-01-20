@@ -1,0 +1,195 @@
+<?xml version="1.0"?>
+<!--
+  TVMD Model with Custom STP-converted Meshes
+
+  使用流程：
+  1. 將您的 STP 檔案轉換為 DAE/STL
+  2. 放置到 meshes/ 目錄
+  3. 根據此範例修改 model.sdf
+-->
+<sdf version='1.10'>
+  <model name='tvmd'>
+    <link name='base_link'>
+      <inertial>
+        <!-- 保持原有慣性參數，或從 CAD 匯出 -->
+        <pose>0.01390591051191776 -0.00055341193166726869 0.02051707341603063 0 0 0</pose>
+        <mass>4.8718421699999999</mass>
+        <inertia>
+          <ixx>0.14678592343825389</ixx>
+          <ixy>0.00037507058797052668</ixy>
+          <ixz>-0.001166404325738742</ixz>
+          <iyy>0.15377608730625311</iyy>
+          <iyz>-0.00020698456824991271</iyz>
+          <izz>0.28041029854143718</izz>
+        </inertia>
+      </inertial>
+
+      <!-- 碰撞：使用簡單幾何體（性能考量） -->
+      <collision name='base_link_collision'>
+        <pose>0 0 0.05 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.5 0.4 0.1</size>  <!-- 根據實際尺寸調整 -->
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+
+      <!-- 視覺化：使用您的高精度 STP 轉換模型 -->
+      <visual name='base_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <!-- 選項 1：使用整體模型 -->
+            <scale>0.001 0.001 0.001</scale>  <!-- CAD 通常是 mm，Gazebo 用 m -->
+            <uri>model://tvmd/meshes/custom/tvmd_complete.dae</uri>
+
+            <!-- 選項 2：使用原有模型 -->
+            <!-- <uri>model://tvmd/meshes/navigator/NavigatorModule-Sim.stl</uri> -->
+          </mesh>
+        </geometry>
+        <material>
+          <!-- DAE 如果包含材質可省略此部分 -->
+          <diffuse>0.125 0.125 0.375 1</diffuse>
+          <ambient>0.125 0.125 0.375 1</ambient>
+          <specular>0.1 0.1 0.1 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+      </visual>
+
+      <!-- 如果想要分離的模組視覺化 -->
+      <visual name='module1_body_visual'>
+        <pose>0.185 0.16 0 0 0 1.5707963267948959</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <!-- 使用轉換後的單一模組模型 -->
+            <uri>model://tvmd/meshes/custom/tvmd_module.dae</uri>
+
+            <!-- 或使用原有模型 -->
+            <!-- <uri>model://tvmd/meshes/agent/base_link.stl</uri> -->
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+          <ambient>0.2 0.2 0.2 1</ambient>
+        </material>
+      </visual>
+
+      <visual name='module2_body_visual'>
+        <pose>0.185 -0.16 0 0 0 1.5707963267948959</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/custom/tvmd_module.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+
+      <visual name='module3_body_visual'>
+        <pose>-0.185 0.16 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/custom/tvmd_module.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+
+      <visual name='module4_body_visual'>
+        <pose>-0.185 -0.16 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/custom/tvmd_module.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+
+      <!-- 感測器保持不變 -->
+      <sensor name='imu_sensor' type='imu'>
+        <always_on>true</always_on>
+        <update_rate>250</update_rate>
+        <visualize>true</visualize>
+        <pose>0 0 0 0 0 0</pose>
+      </sensor>
+
+      <sensor name='air_pressure_sensor' type='air_pressure'>
+        <always_on>true</always_on>
+        <update_rate>50</update_rate>
+        <air_pressure>
+          <pressure>
+            <noise type='gaussian'>
+              <mean>0</mean>
+              <stddev>0.01</stddev>
+            </noise>
+          </pressure>
+        </air_pressure>
+      </sensor>
+
+      <gravity>true</gravity>
+      <self_collide>false</self_collide>
+    </link>
+
+    <!-- Gimbal 和 Actuator Links 保持不變 -->
+    <!-- ... (保留原有的 joint 和 link 定義) ... -->
+
+    <!-- 螺旋槳視覺化可替換為您的模型 -->
+    <link name='module1_prop1_link'>
+      <pose relative_to='module1_actuator_prop1_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.0025377799999999999</mass>
+        <inertia>
+          <ixx>7.0199999999999997e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.9999999999999998e-08</iyy>
+          <iyz>-8.9999999999999999e-08</iyz>
+          <izz>7.0500000000000003e-06</izz>
+        </inertia>
+      </inertial>
+
+      <collision name='module1_prop1_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.005</length>
+            <radius>0.12</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <visual name='module1_prop1_visual'>
+        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <!-- 使用自訂螺旋槳模型 -->
+            <uri>model://tvmd/meshes/custom/tvmd_propeller.dae</uri>
+
+            <!-- 或使用原有模型 -->
+            <!-- <uri>model://tvmd/meshes/agent/Propeller_9047.stl</uri> -->
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1 1 0 1</diffuse>  <!-- 黃色螺旋槳 -->
+          <ambient>1 1 0 1</ambient>
+        </material>
+      </visual>
+
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+
+    <!-- 其他 links、joints、plugins 保持原有結構 -->
+
+  </model>
+</sdf>
