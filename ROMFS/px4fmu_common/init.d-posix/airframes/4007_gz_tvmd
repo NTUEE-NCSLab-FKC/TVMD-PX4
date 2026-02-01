@@ -19,7 +19,16 @@ param set-default I2C_OUT_EN 1
 param set-default SENS_EN_GPSSIM 1
 param set-default SENS_EN_BAROSIM 0
 param set-default SENS_EN_MAGSIM 1
-param set-default SENS_EN_ARSPDSIM 1
+param set-default SENS_EN_ARSPDSIM 0
+
+# Disable airspeed checks (TVMD is a multicopter-like vehicle, no airspeed needed)
+param set-default CBRK_AIRSPD_CHK 162128
+param set-default FW_ARSP_MODE 1
+
+# Disable preflight checks for SITL
+param set-default COM_ARM_WO_GPS 1
+param set-default COM_ARM_MAG_ANG 180
+param set-default SYS_HAS_MAG 0
 
 # TODO: Enable motor failure detection when the
 # VTOL no longer reports 0A for all ESCs in SITL

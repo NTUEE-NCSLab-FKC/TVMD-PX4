@@ -16,8 +16,14 @@ ekf2 start &
 ###############################################################################
 
 
-i2c_out start
-actuator_transporter_i2c start
+#
+# Start hardware-specific drivers only when NOT in simulation
+#
+if ! param compare -s SIM_GZ_EN 1
+then
+	i2c_out start
+	actuator_transporter_i2c start
+fi
 
 #
 # Start Control Allocator
@@ -27,3 +33,8 @@ control_allocator start
 pfa_att_control start
 flight_mode_manager start
 pfa_pos_control start
+
+#
+# Start Land Detector
+#
+land_detector start multicopter
