@@ -29,10 +29,10 @@ param set-default MAV_TYPE 21
 param set-default CA_AIRFRAME 13
 param set-default CA_METHOD 3
 
-# Motor idle and throttle settings
-param set-default MPC_THR_MIN 0.10      # Minimum throttle (10% when armed)
-param set-default MPC_THR_HOVER 0.50    # Expected hover throttle (50%)
-param set-default MPC_MANTHR_MIN 0.05   # Manual mode minimum throttle
+# Motor idle and throttle settings (adjusted for lightweight hardware: 1.88 kg)
+param set-default MPC_THR_MIN 0.05      # Minimum throttle (5% when armed, lighter hardware)
+param set-default MPC_THR_HOVER 0.25    # Expected hover throttle (25%, reduced from 50% due to 61% lighter mass)
+param set-default MPC_MANTHR_MIN 0.02   # Manual mode minimum throttle
 param set-default COM_DISARM_PRFLT 60   # Disarm timeout for preflight check (60s, allow EKF to converge)
 
 # EKF2 and arming check settings for SITL
@@ -42,32 +42,32 @@ param set-default EKF2_REQ_GPS_H 10     # Relax GPS horizontal accuracy requirem
 param set-default EKF2_REQ_VDRIFT 1.0   # Relax vertical drift requirement
 param set-default EKF2_REQ_HDRIFT 1.0   # Relax horizontal drift requirement
 
-# Module settings - H-frame configuration (match hardware: L=0.185m, W=0.16m)
+# Module settings - Asymmetric H-frame configuration (match actual hardware positions)
 param set-default CA_MD_COUNT 4
 
-param set-default CA_MD0_PX 0.185      # Front-Left
-param set-default CA_MD0_PY 0.16
+param set-default CA_MD0_PX 0.1675     # Front-Left (Module 1)
+param set-default CA_MD0_PY 0.1825
 param set-default CA_MD0_PZ 0
 param set-default CA_MD0_AZ 0          # All modules same orientation
 param set-default CA_MD0_X_GR 1.0
 param set-default CA_MD0_Y_GR 1.0
 
-param set-default CA_MD1_PX 0.185      # Front-Right
-param set-default CA_MD1_PY -0.16
+param set-default CA_MD1_PX 0.1675     # Front-Right (Module 2)
+param set-default CA_MD1_PY -0.172
 param set-default CA_MD1_PZ 0
 param set-default CA_MD1_AZ 0          # All modules same orientation
 param set-default CA_MD1_X_GR 1.0
 param set-default CA_MD1_Y_GR 1.0
 
-param set-default CA_MD2_PX -0.185     # Rear-Left
-param set-default CA_MD2_PY 0.16
+param set-default CA_MD2_PX -0.15      # Rear-Left (Module 3)
+param set-default CA_MD2_PY 0.1825
 param set-default CA_MD2_PZ 0
 param set-default CA_MD2_AZ 0
 param set-default CA_MD2_X_GR 1.0
 param set-default CA_MD2_Y_GR 1.0
 
-param set-default CA_MD3_PX -0.185     # Rear-Right
-param set-default CA_MD3_PY -0.16
+param set-default CA_MD3_PX -0.15      # Rear-Right (Module 4)
+param set-default CA_MD3_PY -0.175
 param set-default CA_MD3_PZ 0
 param set-default CA_MD3_AZ 0
 param set-default CA_MD3_X_GR 1.0
@@ -77,7 +77,7 @@ param set-default CA_MD3_Y_GR 1.0
 param set-default CA_ROTOR_COUNT 4
 
 # Motor 0 (Module 0, Front-Left, CW)
-param set-default CA_ROTOR0_CT 0.012   # Match hardware thrust coefficient
+param set-default CA_ROTOR0_CT 0.006   # Thrust coefficient (reduced for lighter 1.88kg mass)
 param set-default CA_ROTOR0_KM -0.0188 # CW rotation
 param set-default CA_ROTOR0_PX 0
 param set-default CA_ROTOR0_PY 0
@@ -85,7 +85,7 @@ param set-default CA_ROTOR0_PZ 0.0     # Single prop at module center
 param set-default CA_ROTOR0_TILT 1
 
 # Motor 1 (Module 1, Front-Right, CCW)
-param set-default CA_ROTOR1_CT 0.012
+param set-default CA_ROTOR1_CT 0.006
 param set-default CA_ROTOR1_KM 0.0188  # CCW rotation
 param set-default CA_ROTOR1_PX 0
 param set-default CA_ROTOR1_PY 0
@@ -93,7 +93,7 @@ param set-default CA_ROTOR1_PZ 0.0
 param set-default CA_ROTOR1_TILT 2
 
 # Motor 2 (Module 2, Rear-Left, CCW)
-param set-default CA_ROTOR2_CT 0.012
+param set-default CA_ROTOR2_CT 0.006
 param set-default CA_ROTOR2_KM 0.0188  # CCW rotation
 param set-default CA_ROTOR2_PX 0
 param set-default CA_ROTOR2_PY 0
@@ -101,7 +101,7 @@ param set-default CA_ROTOR2_PZ 0.0
 param set-default CA_ROTOR2_TILT 3
 
 # Motor 3 (Module 3, Rear-Right, CW)
-param set-default CA_ROTOR3_CT 0.012
+param set-default CA_ROTOR3_CT 0.006
 param set-default CA_ROTOR3_KM -0.0188 # CW rotation
 param set-default CA_ROTOR3_PX 0
 param set-default CA_ROTOR3_PY 0
@@ -169,6 +169,21 @@ param set-default SIM_GZ_EC_MAX1 1000
 param set-default SIM_GZ_EC_MAX2 1000
 param set-default SIM_GZ_EC_MAX3 1000
 param set-default SIM_GZ_EC_MAX4 1000
+
+# PID tuning for lightweight hardware (lower inertia = faster response, need lower gains)
+# Mass: 1.88 kg (61% lighter), Inertia: Ixx=-37%, Iyy=-73%, Izz=-59%
+param set-default MC_ROLL_P 4.0        # Reduced from default 6.5 (lower inertia)
+param set-default MC_ROLLRATE_P 0.10   # Reduced roll rate proportional gain
+param set-default MC_PITCH_P 4.0       # Reduced from default 6.5 (especially low Iyy)
+param set-default MC_PITCHRATE_P 0.10  # Reduced pitch rate proportional gain
+param set-default MC_YAW_P 1.5         # Reduced from default 2.8 (lower Izz)
+param set-default MC_YAWRATE_P 0.15    # Reduced yaw rate proportional gain
+
+# Velocity and acceleration limits (lighter = more agile)
+param set-default MPC_ACC_HOR_MAX 5.0  # Horizontal acceleration (increased from default 3.0)
+param set-default MPC_ACC_UP_MAX 6.0   # Vertical up acceleration (increased from default 4.0)
+param set-default MPC_Z_VEL_MAX_UP 4.0 # Max ascent velocity (increased from 3.0 m/s)
+param set-default MPC_Z_VEL_MAX_DN 2.0 # Max descent velocity (increased from 1.5 m/s)
 
 # Servo outputs (8 servos)
 param set-default SIM_GZ_SV_FUNC1 201

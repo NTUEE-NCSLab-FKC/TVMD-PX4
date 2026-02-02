@@ -2,15 +2,15 @@
   <model name='tvmd'>
     <link name='base_link'>
       <inertial>
-        <pose>0.01390591051191776 -0.00055341193166726869 0.02051707341603063 0 0 0</pose>
-        <mass>4.8718421699999999</mass>
+        <pose>0.020647 0.000208 0.023472 0 0 0</pose>
+        <mass>1.883</mass>
         <inertia>
-          <ixx>0.14678592343825389</ixx>
-          <ixy>0.00037507058797052668</ixy>
-          <ixz>-0.001166404325738742</ixz>
-          <iyy>0.15377608730625311</iyy>
-          <iyz>-0.00020698456824991271</iyz>
-          <izz>0.28041029854143718</izz>
+          <ixx>0.092624</ixx>
+          <ixy>0.000278</ixy>
+          <ixz>-0.000508</ixz>
+          <iyy>0.041137</iyy>
+          <iyz>-0.000213</iyz>
+          <izz>0.114626</izz>
         </inertia>
       </inertial>
       <collision name='base_link_collision'>
@@ -71,7 +71,7 @@
         </material>
       </visual>
       <visual name='base_link_fixed_joint_lump__module1_body_link_visual_2'>
-        <pose>0.185 0.16 0 0 0 1.5707963267948959</pose>
+        <pose>0.1675 0.1825 0 0 0 1.5707963267948959</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -88,7 +88,7 @@
         </material>
       </visual>
       <visual name='base_link_fixed_joint_lump__module2_body_link_visual_3'>
-        <pose>0.185 -0.16 0 0 0 1.5707963267948959</pose>
+        <pose>0.1675 -0.172 0 0 0 1.5707963267948959</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -105,7 +105,7 @@
         </material>
       </visual>
       <visual name='base_link_fixed_joint_lump__module3_body_link_visual_4'>
-        <pose>-0.185 0.16 0 0 0 0</pose>
+        <pose>-0.15 0.1825 0 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -122,7 +122,7 @@
         </material>
       </visual>
       <visual name='base_link_fixed_joint_lump__module4_body_link_visual_5'>
-        <pose>-0.185 -0.16 0 0 0 0</pose>
+        <pose>-0.15 -0.175 0 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -163,7 +163,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module1_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.185 0.16 0.068000000000000005 0 0 1.5707963267948959</pose>
+      <pose relative_to='base_link'>0.1675 0.1825 0.068000000000000005 0 0 1.5707963267948959</pose>
       <parent>base_link</parent>
       <child>module1_gimbal_link</child>
       <axis>
@@ -341,7 +341,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module2_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.185 -0.16 0.068000000000000005 0 0 1.5707963267948959</pose>
+      <pose relative_to='base_link'>0.1675 -0.172 0.068000000000000005 0 0 1.5707963267948959</pose>
       <parent>base_link</parent>
       <child>module2_gimbal_link</child>
       <axis>
@@ -519,7 +519,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module3_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.185 0.16 0.068000000000000005 0 0 0</pose>
+      <pose relative_to='base_link'>-0.15 0.1825 0.068000000000000005 0 0 0</pose>
       <parent>base_link</parent>
       <child>module3_gimbal_link</child>
       <axis>
@@ -697,7 +697,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module4_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.185 -0.16 0.068000000000000005 0 0 0</pose>
+      <pose relative_to='base_link'>-0.15 -0.175 0.068000000000000005 0 0 0</pose>
       <parent>base_link</parent>
       <child>module4_gimbal_link</child>
       <axis>
@@ -977,25 +977,25 @@
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module1_body_link' attached_to='base_link'>
-      <pose>0.185 0.16 0 0 0 1.5707963267948959</pose>
+      <pose>0.1675 0.1825 0 0 0 1.5707963267948959</pose>
     </frame>
     <frame name='module1_body_link' attached_to='rigid_base_link_module1_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module2_body_link' attached_to='base_link'>
-      <pose>0.185 -0.16 0 0 0 1.5707963267948959</pose>
+      <pose>0.1675 -0.172 0 0 0 1.5707963267948959</pose>
     </frame>
     <frame name='module2_body_link' attached_to='rigid_base_link_module2_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module3_body_link' attached_to='base_link'>
-      <pose>-0.185 0.16 0 0 0 0</pose>
+      <pose>-0.15 0.1825 0 0 0 0</pose>
     </frame>
     <frame name='module3_body_link' attached_to='rigid_base_link_module3_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module4_body_link' attached_to='base_link'>
-      <pose>-0.185 -0.16 0 0 0 0</pose>
+      <pose>-0.15 -0.175 0 0 0 0</pose>
     </frame>
     <frame name='module4_body_link' attached_to='rigid_base_link_module4_body_link'>
       <pose>0 0 0 0 0 0</pose>
