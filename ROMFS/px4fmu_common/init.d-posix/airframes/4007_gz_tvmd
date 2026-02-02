@@ -33,7 +33,14 @@ param set-default CA_METHOD 3
 param set-default MPC_THR_MIN 0.10      # Minimum throttle (10% when armed)
 param set-default MPC_THR_HOVER 0.50    # Expected hover throttle (50%)
 param set-default MPC_MANTHR_MIN 0.05   # Manual mode minimum throttle
-param set-default COM_DISARM_PRFLT 10   # Disarm timeout for preflight check (10s)
+param set-default COM_DISARM_PRFLT 60   # Disarm timeout for preflight check (60s, allow EKF to converge)
+
+# EKF2 and arming check settings for SITL
+param set-default COM_ARM_EKF_VEL 0.5   # Allow higher velocity error for arming (SITL)
+param set-default COM_ARM_EKF_HGT 1.0   # Allow higher height error for arming (SITL)
+param set-default EKF2_REQ_GPS_H 10     # Relax GPS horizontal accuracy requirement (10m)
+param set-default EKF2_REQ_VDRIFT 1.0   # Relax vertical drift requirement
+param set-default EKF2_REQ_HDRIFT 1.0   # Relax horizontal drift requirement
 
 # Module settings - H-frame configuration (match hardware: L=0.185m, W=0.16m)
 param set-default CA_MD_COUNT 4
