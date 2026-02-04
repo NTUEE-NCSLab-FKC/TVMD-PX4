@@ -4,12 +4,14 @@ TVMD Square Trajectory Test (pymavlink, no ROS needed)
 Takeoff -> Fly 1m x 1m square at 1m altitude -> Land
 """
 import time
+import sys
 from pymavlink import mavutil
 
 # Connect to PX4 SITL
+print("Connecting to PX4...")
 master = mavutil.mavlink_connection('udp:127.0.0.1:14550')
 master.wait_heartbeat()
-print("Connected to PX4")
+print(f"Connected! (system {master.target_system}, component {master.target_component})")
 
 
 def set_position_target(x, y, z):
@@ -38,75 +40,150 @@ def reached(tx, ty, tz, tol=0.3):
     x, y, z = get_local_position()
     if x is None:
         return False
-    return ((x - tx)**2 + (y - ty)**2 + (z - tz)**2) ** 0.5 < tol
+    dist = ((x - tx)**2 + (y - ty)**2 + (z - tz)**2) ** 0.5
+    return dist < tol
 
 
-def set_mode(mode):
-    """Set PX4 flight mode"""
+def wait_for_arm(timeout=10):
+    """Wait until vehicle is armed"""
+    start = time.time()
+    while time.time() - start < timeout:
+        msg = master.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
+        if msg and (msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
+            return True
+    return False
+
+
+def wait_for_mode(mode_name, timeout=5):
+    """Wait until vehicle enters the expected mode"""
+    start = time.time()
+    while time.time() - start < timeout:
+        msg = master.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
+        if msg:
+            flightmode = mavutil.mode_string_v10(msg)
+            if mode_name in flightmode.upper():
+                return True
+    return False
+
+
+def set_mode_offboard():
+    """Set OFFBOARD mode (PX4 custom main mode = 6)"""
     master.mav.command_long_send(
         master.target_system, master.target_component,
         mavutil.mavlink.MAV_CMD_DO_SET_MODE, 0,
         float(mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED),
-        float(mode), 0.0, 0.0, 0.0, 0.0, 0.0)
+        6.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
-def arm():
+def set_mode_land():
+    """Set AUTO.LAND mode (PX4 main=4 AUTO, sub=6 LAND)"""
+    master.mav.command_long_send(
+        master.target_system, master.target_component,
+        mavutil.mavlink.MAV_CMD_DO_SET_MODE, 0,
+        float(mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED),
+        4.0, 6.0, 0.0, 0.0, 0.0, 0.0)
+
+
+def arm(force=False):
+    """Arm the vehicle. force=True bypasses preflight checks."""
+    p2 = 21196.0 if force else 0.0
     master.mav.command_long_send(
         master.target_system, master.target_component,
         mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0,
-        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        1.0, p2, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
-# PX4 custom mode IDs
-PX4_OFFBOARD = 6
-PX4_AUTO_LAND = 0x06000004  # AUTO.LAND
+# ---- Check local position is valid ----
+print("\nChecking local position estimate...")
+x, y, z = get_local_position()
+if x is None:
+    print("ERROR: No local position data. Is EKF2 running?")
+    sys.exit(1)
+print(f"  Current position: ({x:.2f}, {y:.2f}, {z:.2f})")
 
+# ---- Send setpoints before OFFBOARD (PX4 requires this) ----
+print("\nSending initial setpoints (5 seconds)...")
+for i in range(100):
+    set_position_target(0.0, 0.0, -1.0)
+    time.sleep(0.05)
+
+# ---- Switch to OFFBOARD ----
+print("Setting OFFBOARD mode...")
+set_mode_offboard()
+if wait_for_mode("OFFBOARD"):
+    print("  OFFBOARD mode confirmed!")
+else:
+    print("  WARNING: Could not confirm OFFBOARD mode, trying anyway...")
+
+# Keep sending setpoints while arming
+print("Arming...")
+for i in range(20):
+    set_position_target(0.0, 0.0, -1.0)
+    time.sleep(0.05)
+arm()
+
+# Keep sending setpoints and wait for arm
+armed = False
+for i in range(100):
+    set_position_target(0.0, 0.0, -1.0)
+    msg = master.recv_match(type='HEARTBEAT', blocking=False)
+    if msg and (msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
+        armed = True
+        break
+    time.sleep(0.05)
+
+if not armed:
+    print("  Normal arm failed, trying force arm...")
+    arm(force=True)
+    for i in range(100):
+        set_position_target(0.0, 0.0, -1.0)
+        msg = master.recv_match(type='HEARTBEAT', blocking=False)
+        if msg and (msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
+            armed = True
+            break
+        time.sleep(0.05)
+
+if armed:
+    print("  Armed successfully!")
+else:
+    print("  ERROR: Failed to arm. Check 'commander check' in pxh.")
+    sys.exit(1)
+
+# ---- Fly the square ----
 # Square waypoints in NED (z negative = up)
 waypoints = [
-    (0.0, 0.0, -1.0),   # Takeoff
+    (0.0, 0.0, -1.0),   # Takeoff / hover
     (1.0, 0.0, -1.0),   # Forward 1m
     (1.0, 1.0, -1.0),   # Right 1m
     (0.0, 1.0, -1.0),   # Back 1m
     (0.0, 0.0, -1.0),   # Return home
 ]
 
-# Send setpoints before switching to OFFBOARD (required by PX4)
-print("Sending initial setpoints...")
-for i in range(100):
-    set_position_target(0, 0, -1.0)
-    time.sleep(0.05)
-
-# Switch to OFFBOARD and arm
-print("Setting OFFBOARD mode...")
-set_mode(PX4_OFFBOARD)
-time.sleep(1)
-
-print("Arming...")
-arm()
-time.sleep(3)
-
-# Fly the square
-for i, (x, y, z) in enumerate(waypoints):
-    print(f"Flying to waypoint {i}: ({x}, {y}, {z})")
-    timeout = time.time() + 15
+for i, (wx, wy, wz) in enumerate(waypoints):
+    label = ["Takeoff/Hover", "Forward", "Right", "Back", "Return"][i]
+    print(f"\n[{i}] {label} -> ({wx}, {wy}, {wz})")
+    timeout = time.time() + 20
     while time.time() < timeout:
-        set_position_target(x, y, z)
-        if reached(x, y, z):
-            print(f"  Reached waypoint {i}, holding 3s...")
-            hold_end = time.time() + 3
-            while time.time() < hold_end:
-                set_position_target(x, y, z)
-                time.sleep(0.05)
-            break
+        set_position_target(wx, wy, wz)
+        x, y, z = get_local_position()
+        if x is not None:
+            dist = ((x - wx)**2 + (y - wy)**2 + (z - wz)**2) ** 0.5
+            if dist < 0.3:
+                print(f"  Reached! pos=({x:.2f}, {y:.2f}, {z:.2f}), holding 3s...")
+                hold_end = time.time() + 3
+                while time.time() < hold_end:
+                    set_position_target(wx, wy, wz)
+                    time.sleep(0.05)
+                break
         time.sleep(0.05)
     else:
-        print(f"  Timeout at waypoint {i}")
+        if x is not None:
+            print(f"  Timeout. Last pos=({x:.2f}, {y:.2f}, {z:.2f})")
+        else:
+            print(f"  Timeout. No position data.")
 
-# Land
-print("Landing...")
-master.mav.command_long_send(
-    master.target_system, master.target_component,
-    mavutil.mavlink.MAV_CMD_NAV_LAND, 0,
-    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-time.sleep(10)
+# ---- Land ----
+print("\nLanding...")
+set_mode_land()
+time.sleep(15)
 print("Done!")
