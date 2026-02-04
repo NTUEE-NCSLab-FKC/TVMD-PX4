@@ -11,6 +11,9 @@ from pymavlink import mavutil
 print("Connecting to PX4...")
 master = mavutil.mavlink_connection('udp:127.0.0.1:14550')
 master.wait_heartbeat()
+# PX4 autopilot is component 1
+master.target_system = master.target_system
+master.target_component = 1
 print(f"Connected! (system {master.target_system}, component {master.target_component})")
 
 
@@ -54,14 +57,16 @@ def wait_for_arm(timeout=10):
     return False
 
 
-def wait_for_mode(mode_name, timeout=5):
-    """Wait until vehicle enters the expected mode"""
+def wait_for_mode(target_main_mode, timeout=5):
+    """Wait until vehicle enters the expected PX4 custom mode"""
     start = time.time()
     while time.time() - start < timeout:
         msg = master.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
         if msg:
-            flightmode = mavutil.mode_string_v10(msg)
-            if mode_name in flightmode.upper():
+            # PX4 custom_mode: bits 16-23 = main mode
+            main_mode = (msg.custom_mode >> 16) & 0xFF
+            sub_mode = (msg.custom_mode >> 24) & 0xFF
+            if main_mode == target_main_mode:
                 return True
     return False
 
@@ -110,10 +115,19 @@ for i in range(100):
 # ---- Switch to OFFBOARD ----
 print("Setting OFFBOARD mode...")
 set_mode_offboard()
-if wait_for_mode("OFFBOARD"):
+if wait_for_mode(6):  # PX4 OFFBOARD main mode = 6
     print("  OFFBOARD mode confirmed!")
 else:
-    print("  WARNING: Could not confirm OFFBOARD mode, trying anyway...")
+    print("  WARNING: Could not confirm OFFBOARD mode, retrying...")
+    # Retry: send more setpoints and try again
+    for _ in range(50):
+        set_position_target(0.0, 0.0, -1.0)
+        time.sleep(0.05)
+    set_mode_offboard()
+    if wait_for_mode(6):
+        print("  OFFBOARD mode confirmed on retry!")
+    else:
+        print("  WARNING: Still not in OFFBOARD mode, continuing...")
 
 # Keep sending setpoints while arming
 print("Arming...")
@@ -159,6 +173,7 @@ waypoints = [
     (0.0, 0.0, -1.0),   # Return home
 ]
 
+last_print = 0
 for i, (wx, wy, wz) in enumerate(waypoints):
     label = ["Takeoff/Hover", "Forward", "Right", "Back", "Return"][i]
     print(f"\n[{i}] {label} -> ({wx}, {wy}, {wz})")
@@ -168,6 +183,11 @@ for i, (wx, wy, wz) in enumerate(waypoints):
         x, y, z = get_local_position()
         if x is not None:
             dist = ((x - wx)**2 + (y - wy)**2 + (z - wz)**2) ** 0.5
+            # Print position every 2 seconds
+            now = time.time()
+            if now - last_print > 2.0:
+                print(f"  pos=({x:.2f}, {y:.2f}, {z:.2f}) dist={dist:.2f}")
+                last_print = now
             if dist < 0.3:
                 print(f"  Reached! pos=({x:.2f}, {y:.2f}, {z:.2f}), holding 3s...")
                 hold_end = time.time() + 3
