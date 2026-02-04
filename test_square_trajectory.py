@@ -46,15 +46,15 @@ def set_mode(mode):
     master.mav.command_long_send(
         master.target_system, master.target_component,
         mavutil.mavlink.MAV_CMD_DO_SET_MODE, 0,
-        mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
-        mode, 0, 0, 0, 0, 0)
+        float(mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED),
+        float(mode), 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 def arm():
     master.mav.command_long_send(
         master.target_system, master.target_component,
         mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0,
-        1, 0, 0, 0, 0, 0, 0)
+        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 # PX4 custom mode IDs
@@ -107,6 +107,6 @@ print("Landing...")
 master.mav.command_long_send(
     master.target_system, master.target_component,
     mavutil.mavlink.MAV_CMD_NAV_LAND, 0,
-    0, 0, 0, 0, 0, 0, 0)
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 time.sleep(10)
 print("Done!")
