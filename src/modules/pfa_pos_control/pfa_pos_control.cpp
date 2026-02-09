@@ -263,11 +263,25 @@ void PFAPOSControl::Run()
 			const float max_vel_xy = 2.0f;
 			const float max_yaw_rate = 1.0f;  // rad/s
 
+			// Velocity control gain for manual mode
+			// This compensates for the low PFA_GAIN_X_D/Y_D values (0.05) which are tuned for position control
+			// For velocity control, we need a gain of ~1.0-2.0 to get responsive behavior
+			const float vel_control_gain = 2.0f;
+
 			// Convert stick to velocity commands (NED frame)
 			// pitch stick forward (-1) = fly forward (positive X in NED)
 			// roll stick right (+1) = fly right (positive Y in NED)
-			const float vel_x = -_manual_control_setpoint.pitch * max_vel_xy;  // forward/backward
-			const float vel_y = _manual_control_setpoint.roll * max_vel_xy;    // left/right
+			const float vel_x_cmd = -_manual_control_setpoint.pitch * max_vel_xy;  // forward/backward
+			const float vel_y_cmd = _manual_control_setpoint.roll * max_vel_xy;    // left/right
+
+			// Get current velocity from local position
+			const float vel_x_cur = vlocal_pos.vx;
+			const float vel_y_cur = vlocal_pos.vy;
+
+			// Calculate velocity error and use as feedforward acceleration
+			// This provides responsive velocity control without changing position control tuning
+			const float acc_x = (vel_x_cmd - vel_x_cur) * vel_control_gain;
+			const float acc_y = (vel_y_cmd - vel_y_cur) * vel_control_gain;
 
 			// Yaw rate from yaw stick
 			const float yaw_rate = _manual_control_setpoint.yaw * max_yaw_rate;
@@ -286,11 +300,11 @@ void PFAPOSControl::Run()
 			traj_des.position[0] = NAN;
 			traj_des.position[1] = NAN;
 			traj_des.position[2] = NAN;
-			traj_des.velocity[0] = vel_x;  // forward/backward from pitch stick
-			traj_des.velocity[1] = vel_y;  // left/right from roll stick
+			traj_des.velocity[0] = vel_x_cmd;  // forward/backward from pitch stick
+			traj_des.velocity[1] = vel_y_cmd;  // left/right from roll stick
 			traj_des.velocity[2] = vel_z;
-			traj_des.acceleration[0] = 0;
-			traj_des.acceleration[1] = 0;
+			traj_des.acceleration[0] = acc_x;  // feedforward acceleration for velocity control
+			traj_des.acceleration[1] = acc_y;  // feedforward acceleration for velocity control
 			traj_des.acceleration[2] = acc_z;
 
 			_thrust_up_max = -1.0f;
