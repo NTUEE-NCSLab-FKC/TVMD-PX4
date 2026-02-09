@@ -261,6 +261,7 @@ void PFAPOSControl::Run()
 
 			// Maximum XY velocity (m/s) - can be tuned via parameter
 			const float max_vel_xy = 2.0f;
+			const float max_yaw_rate = 1.0f;  // rad/s
 
 			// Convert stick to velocity commands (NED frame)
 			// pitch stick forward (-1) = fly forward (positive X in NED)
@@ -269,7 +270,7 @@ void PFAPOSControl::Run()
 			const float vel_y = _manual_control_setpoint.roll * max_vel_xy;    // left/right
 
 			// Yaw rate from yaw stick
-			const float yaw_rate = _manual_control_setpoint.yaw;
+			const float yaw_rate = _manual_control_setpoint.yaw * max_yaw_rate;
 
 			// throttle normalize from -1~1 to 0~1
 			const float level = (_manual_control_setpoint.throttle - (-1.0f)) / (1.0f - (-1.0f));
@@ -295,14 +296,15 @@ void PFAPOSControl::Run()
 			_thrust_up_max = -1.0f;
 			_thrust_xy_max = -0.3f * _thrust_up_max;
 
-			// Keep body level (roll = pitch = 0), only yaw changes
+			// Keep body level (roll = pitch = 0), yaw controlled by stick
 			// Extract current yaw from quaternion
 			const Quatf q_att(_vehicle_attitude.q);
 			const Eulerf euler_att(q_att);
 			const float current_yaw = euler_att(2);  // yaw is the third element
 
-			// TODO: add yaw rate control integration
-			const Vector3f attitude_des = Vector3f(0.0f, 0.0f, current_yaw);
+			// Integrate yaw rate to get desired yaw
+			const float desired_yaw = current_yaw + yaw_rate * dt;
+			const Vector3f attitude_des = Vector3f(0.0f, 0.0f, desired_yaw);
 
 			pose_controller_6dof(
 				traj_des, attitude_des, _vehicle_attitude, vlocal_pos);
