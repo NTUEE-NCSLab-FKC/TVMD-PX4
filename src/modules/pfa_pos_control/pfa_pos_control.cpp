@@ -269,10 +269,10 @@ void PFAPOSControl::Run()
 			const float vel_control_gain = 2.0f;
 
 			// Convert stick to velocity commands (NED frame)
-			// pitch stick forward (-1) = fly forward (positive X in NED)
+			// pitch stick forward (+1) = fly forward (positive X in NED)
 			// roll stick right (+1) = fly right (positive Y in NED)
-			const float vel_x_cmd = -_manual_control_setpoint.pitch * max_vel_xy;  // forward/backward
-			const float vel_y_cmd = _manual_control_setpoint.roll * max_vel_xy;    // left/right
+			const float vel_x_cmd = _manual_control_setpoint.pitch * max_vel_xy;  // forward/backward
+			const float vel_y_cmd = _manual_control_setpoint.roll * max_vel_xy;   // left/right
 
 			// Get current velocity from local position
 			const float vel_x_cur = vlocal_pos.vx;
