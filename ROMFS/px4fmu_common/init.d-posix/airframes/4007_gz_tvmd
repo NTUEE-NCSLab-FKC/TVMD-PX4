@@ -20,6 +20,12 @@ param set-default SENS_EN_GPSSIM 1
 param set-default SENS_EN_BAROSIM 0
 param set-default SENS_EN_MAGSIM 1
 param set-default SENS_EN_ARSPDSIM 1
+param set-default CBRK_AIRSPD_CHK 162128
+param set-default FW_ARSP_MODE 1
+
+param set-default COM_ARM_WO_GPS 1
+param set-default COM_ARM_MAG_ANG 180
+param set-default SYS_HAS_MAG 0
 
 # TODO: Enable motor failure detection when the
 # VTOL no longer reports 0A for all ESCs in SITL
@@ -34,7 +40,7 @@ param set-default CA_METHOD 3
 # Module settings
 param set-default CA_MD_COUNT 4
 
-param set-default CA_MD0_PX 0.185      # Front-Left (changed from 0.215)
+param set-default CA_MD0_PX 0.16      # Front-Left (changed from 0.215)
 param set-default CA_MD0_PY 0.16       # (changed from 0.215)
 param set-default CA_MD0_PZ 0
 param set-default CA_MD0_AZ 0          # All modules same orientation (changed from 1)
@@ -42,7 +48,7 @@ param set-default CA_MD0_X_GR 1.0
 param set-default CA_MD0_Y_GR 1.0
 
 
-param set-default CA_MD1_PX 0.185      # Front-Right (changed from 0.215)
+param set-default CA_MD1_PX 0.16      # Front-Right (changed from 0.215)
 param set-default CA_MD1_PY -0.16      # (changed from -0.215)
 param set-default CA_MD1_PZ 0
 param set-default CA_MD1_AZ 0          # All modules same orientation (changed from 1)
@@ -50,7 +56,7 @@ param set-default CA_MD1_X_GR 1.0
 param set-default CA_MD1_Y_GR 1.0
 
 
-param set-default CA_MD2_PX -0.185     # Rear-Left (changed from -0.215)
+param set-default CA_MD2_PX -0.16     # Rear-Left (changed from -0.215)
 param set-default CA_MD2_PY 0.16       # (changed from 0.215)
 param set-default CA_MD2_PZ 0
 param set-default CA_MD2_AZ 0
@@ -58,8 +64,9 @@ param set-default CA_MD2_X_GR 1.0
 param set-default CA_MD2_Y_GR 1.0
 
 
-param set-default CA_MD3_PX -0.185     # Rear-Right (changed from -0.215)
+aram set-default CA_MD3_PX -0.16     # Rear-Right (changed from -0.215)
 param set-default CA_MD3_PY -0.16      # (changed from -0.215)
+param set-default CA_MD3_PZ 0
 param set-default CA_MD3_AZ 0
 param set-default CA_MD3_X_GR 1.0
 param set-default CA_MD3_Y_GR 1.0
@@ -195,8 +202,8 @@ param set-default CA_ROTOR3_PZ 0.0     # Changed: -0.2 -> 0.0
 param set-default CA_SV_TL_COUNT 8
 
 
-param set-default CA_SV_TL0_MINA -30   # Changed: -20 -> -30
-param set-default CA_SV_TL0_MAXA 30    # Changed: 20 -> 30
+param set-default CA_SV_TL0_MINA -30   # Changed: -20 -> -45
+param set-default CA_SV_TL0_MAXA 30     # Changed: 20 -> 45
 param set-default CA_SV_TL0_TD 0       # X-axis tilt
 param set-default CA_SV_TL0_CT 1
 
@@ -207,8 +214,8 @@ param set-default CA_SV_TL1_TD 90      # Y-axis tilt
 param set-default CA_SV_TL1_CT 1
 
 
-param set-default CA_SV_TL2_MINA -30   # Changed: -20 -> -30
-param set-default CA_SV_TL2_MAXA 30    # Changed: 20 -> 30
+param set-default CA_SV_TL2_MINA -30    # Changed: -20 -> -45
+param set-default CA_SV_TL2_MAXA 30    # Changed: 20 -> 45
 param set-default CA_SV_TL2_TD 0       # X-axis tilt
 param set-default CA_SV_TL2_CT 1
 
@@ -219,8 +226,8 @@ param set-default CA_SV_TL3_TD 90      # Y-axis tilt
 param set-default CA_SV_TL3_CT 1
 
 
-param set-default CA_SV_TL4_MINA -30   # Changed: -20 -> -30
-param set-default CA_SV_TL4_MAXA 30    # Changed: 20 -> 30
+param set-default CA_SV_TL4_MINA -30    # Changed: -20 -> -45
+param set-default CA_SV_TL4_MAXA 30    # Changed: 20 -> 45
 param set-default CA_SV_TL4_TD 0       # X-axis tilt
 param set-default CA_SV_TL4_CT 1
 
@@ -231,8 +238,8 @@ param set-default CA_SV_TL5_TD 90      # Y-axis tilt
 param set-default CA_SV_TL5_CT 1
 
 
-param set-default CA_SV_TL6_MINA -30   # Changed: -20 -> -30
-param set-default CA_SV_TL6_MAXA 30    # Changed: 20 -> 30
+param set-default CA_SV_TL6_MINA -30    # Changed: -20 -> -45
+param set-default CA_SV_TL6_MAXA 30    # Changed: 20 -> 45
 param set-default CA_SV_TL6_TD 0       # X-axis tilt
 param set-default CA_SV_TL6_CT 1
 

@@ -112,49 +112,53 @@ PARAM_DEFINE_FLOAT(PFA_MAX_TOR, 15.0f);
  *
  * @group PFA Attitude Control
  */
-PARAM_DEFINE_FLOAT(VEH_AGENT_IXX, 0.0170f);
+PARAM_DEFINE_FLOAT(VEH_AGENT_IXX, 0.0f);
+// 0.0170f
 
 /**
  * Inertia matrix of the vechicle
  *
  * @group PFA Attitude Control
  */
-PARAM_DEFINE_FLOAT(VEH_AGENT_IYY, 0.0029f);
+PARAM_DEFINE_FLOAT(VEH_AGENT_IYY, 0.0f);
+// 0.0029f
 
 /**
  * Inertia matrix of the vechicle
  *
  * @group PFA Attitude Control
  */
-PARAM_DEFINE_FLOAT(VEH_AGENT_IZZ, 0.0178f);
+PARAM_DEFINE_FLOAT(VEH_AGENT_IZZ, 0.0f);
+// 0.0178f
 
 /**
  * Inertia matrix of the vechicle
  *
  * @group PFA Attitude Control
  */
-PARAM_DEFINE_FLOAT(VEH_NAV_IXX, 0.0121f);
+PARAM_DEFINE_FLOAT(VEH_NAV_IXX, 0.02f); // 0.0121f
 
 /**
  * Inertia matrix of the vechicle
  *
  * @group PFA Attitude Control
  */
-PARAM_DEFINE_FLOAT(VEH_NAV_IYY, 0.0184f);
+PARAM_DEFINE_FLOAT(VEH_NAV_IYY, 0.02f);
+// 0.0184f
 
 /**
  * Inertia matrix of the vechicle
  *
  * @group PFA Attitude Control
  */
-PARAM_DEFINE_FLOAT(VEH_NAV_IZZ, 0.0214f);
+PARAM_DEFINE_FLOAT(VEH_NAV_IZZ, 0.02f); // 0.0214f
 
 /**
  * Mass of a single agent in Kg
  *
  * @group PFA Attitude Control
  */
-PARAM_DEFINE_FLOAT(VEH_AGENT_MASS, 0.5421f);
+PARAM_DEFINE_FLOAT(VEH_AGENT_MASS, 0.1f); // 0.5421f
 
 /**
  * Mass of a single agent in Kg

@@ -16,8 +16,16 @@ ekf2 start &
 ###############################################################################
 
 
-i2c_out start
-actuator_transporter_i2c start
+# i2c_out start
+# actuator_transporter_i2c start
+
+# Start hardware-specific drivers only when NOT in simulation
+ if ! param compare -s SIM_GZ_EN 1
+ then
+     i2c_out start
+     actuator_transporter_i2c start
+ fi
+
 
 #
 # Start Control Allocator

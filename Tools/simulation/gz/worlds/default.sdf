@@ -44,7 +44,7 @@
         </gz-gui>
         <play_pause>1</play_pause>
         <step>1</step>
-        <start_paused>1</start_paused>
+        <start_paused>0</start_paused> <!-- changed to 0 to start unpaused -->
       </plugin>
       <plugin name='World stats' filename='WorldStats'>
         <gz-gui>
