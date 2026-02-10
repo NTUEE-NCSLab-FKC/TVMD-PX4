@@ -31,8 +31,10 @@ print(f"Connected! (system {master.target_system}, component {master.target_comp
 
 def set_position_yaw_target(x, y, z, yaw=0):
     """Send position and yaw setpoint in NED frame (z negative = up)"""
-    # type_mask: use position (bits 0-2=0) and yaw (bit 10=0)
-    type_mask = 0b0000011111111000  # position + yaw
+    # type_mask bits: 0-2=pos, 3-5=vel, 6-8=acc, 9=force, 10=yaw, 11=yaw_rate
+    # Set bit to 0 to USE, set to 1 to IGNORE
+    # Position + yaw: ignore vel(3-5), acc(6-8), force(9), yaw_rate(11)
+    type_mask = 0b0000101111111000  # position + yaw (bit 10=0)
     master.mav.set_position_target_local_ned_send(
         0, master.target_system, master.target_component,
         mavutil.mavlink.MAV_FRAME_LOCAL_NED, type_mask,
@@ -41,8 +43,8 @@ def set_position_yaw_target(x, y, z, yaw=0):
 
 def set_velocity_yaw_target(vx, vy, vz, yaw=0):
     """Send velocity and yaw setpoint in NED frame"""
-    # type_mask: use velocity (bits 3-5=0) and yaw (bit 10=0)
-    type_mask = 0b0000011111000111  # velocity + yaw
+    # Velocity + yaw: ignore pos(0-2), acc(6-8), force(9), yaw_rate(11)
+    type_mask = 0b0000101111000111  # velocity + yaw (bit 10=0)
     master.mav.set_position_target_local_ned_send(
         0, master.target_system, master.target_component,
         mavutil.mavlink.MAV_FRAME_LOCAL_NED, type_mask,
