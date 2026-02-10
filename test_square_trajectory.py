@@ -1,78 +1,90 @@
 #!/usr/bin/env python3
 """
-TVMD Square Trajectory Test (pymavlink, no ROS needed)
-Takeoff -> Fly 1m x 1m square at 1m altitude -> Land
+TVMD Square Trajectory Test with Yaw at Corners
+Takeoff -> Fly 1m x 1m square at 1m altitude with yaw rotation -> Land
+
+At each corner, the vehicle rotates to face the direction of travel:
+  Corner 0: yaw=0°   (facing +X)
+  Corner 1: yaw=90°  (facing +Y)
+  Corner 2: yaw=180° (facing -X)
+  Corner 3: yaw=-90° (facing -Y)
 """
 import time
 import sys
+import math
 from pymavlink import mavutil
+
+# ============ Configuration ============
+SIDE_LENGTH = 1.0       # Square side length (meters)
+FLIGHT_HEIGHT = 1.0     # Flight height (meters)
+VELOCITY = 0.5          # Flight velocity (m/s)
+CORNER_HOLD_TIME = 2.0  # Time to hold at each corner (seconds)
 
 # Connect to PX4 SITL
 print("Connecting to PX4...")
 master = mavutil.mavlink_connection('udp:127.0.0.1:14550')
 master.wait_heartbeat()
-# PX4 autopilot is component 1
 master.target_system = master.target_system
 master.target_component = 1
 print(f"Connected! (system {master.target_system}, component {master.target_component})")
 
 
-def set_position_target(x, y, z):
-    """Send position setpoint in NED frame (z negative = up)"""
+def set_position_yaw_target(x, y, z, yaw=0):
+    """Send position and yaw setpoint in NED frame (z negative = up)"""
+    # type_mask: use position (bits 0-2=0) and yaw (bit 10=0)
+    type_mask = 0b0000011111111000  # position + yaw
     master.mav.set_position_target_local_ned_send(
-        0,                          # time_boot_ms
-        master.target_system,
-        master.target_component,
-        mavutil.mavlink.MAV_FRAME_LOCAL_NED,
-        0b0000111111111000,         # type_mask (position only)
-        x, y, z,                    # x, y, z (NED)
-        0, 0, 0,                    # vx, vy, vz
-        0, 0, 0,                    # afx, afy, afz
-        0, 0                        # yaw, yaw_rate
-    )
+        0, master.target_system, master.target_component,
+        mavutil.mavlink.MAV_FRAME_LOCAL_NED, type_mask,
+        x, y, z, 0, 0, 0, 0, 0, 0, yaw, 0)
+
+
+def set_velocity_yaw_target(vx, vy, vz, yaw=0):
+    """Send velocity and yaw setpoint in NED frame"""
+    # type_mask: use velocity (bits 3-5=0) and yaw (bit 10=0)
+    type_mask = 0b0000011111000111  # velocity + yaw
+    master.mav.set_position_target_local_ned_send(
+        0, master.target_system, master.target_component,
+        mavutil.mavlink.MAV_FRAME_LOCAL_NED, type_mask,
+        0, 0, 0, vx, vy, vz, 0, 0, 0, yaw, 0)
 
 
 def get_local_position():
     msg = master.recv_match(type='LOCAL_POSITION_NED', blocking=True, timeout=3)
     if msg:
-        return msg.x, msg.y, msg.z
+        return msg.x, msg.y, msg.z, msg.vx, msg.vy, msg.vz
+    return None, None, None, None, None, None
+
+
+def get_attitude():
+    """Get current attitude (roll, pitch, yaw)"""
+    msg = master.recv_match(type='ATTITUDE', blocking=True, timeout=1)
+    if msg:
+        return msg.roll, msg.pitch, msg.yaw
     return None, None, None
 
 
-def reached(tx, ty, tz, tol=0.3):
-    x, y, z = get_local_position()
-    if x is None:
-        return False
-    dist = ((x - tx)**2 + (y - ty)**2 + (z - tz)**2) ** 0.5
-    return dist < tol
-
-
-def wait_for_arm(timeout=10):
-    """Wait until vehicle is armed"""
-    start = time.time()
-    while time.time() - start < timeout:
-        msg = master.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
-        if msg and (msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
-            return True
-    return False
+def normalize_angle(angle):
+    """Normalize angle to [-pi, pi]"""
+    while angle > math.pi:
+        angle -= 2 * math.pi
+    while angle < -math.pi:
+        angle += 2 * math.pi
+    return angle
 
 
 def wait_for_mode(target_main_mode, timeout=5):
-    """Wait until vehicle enters the expected PX4 custom mode"""
     start = time.time()
     while time.time() - start < timeout:
         msg = master.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
         if msg:
-            # PX4 custom_mode: bits 16-23 = main mode
             main_mode = (msg.custom_mode >> 16) & 0xFF
-            sub_mode = (msg.custom_mode >> 24) & 0xFF
             if main_mode == target_main_mode:
                 return True
     return False
 
 
 def set_mode_offboard():
-    """Set OFFBOARD mode (PX4 custom main mode = 6)"""
     master.mav.command_long_send(
         master.target_system, master.target_component,
         mavutil.mavlink.MAV_CMD_DO_SET_MODE, 0,
@@ -81,7 +93,6 @@ def set_mode_offboard():
 
 
 def set_mode_land():
-    """Set AUTO.LAND mode (PX4 main=4 AUTO, sub=6 LAND)"""
     master.mav.command_long_send(
         master.target_system, master.target_component,
         mavutil.mavlink.MAV_CMD_DO_SET_MODE, 0,
@@ -90,7 +101,6 @@ def set_mode_land():
 
 
 def arm(force=False):
-    """Arm the vehicle. force=True bypasses preflight checks."""
     p2 = 21196.0 if force else 0.0
     master.mav.command_long_send(
         master.target_system, master.target_component,
@@ -98,48 +108,71 @@ def arm(force=False):
         1.0, p2, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
-# ---- Check local position is valid ----
+def fly_to_position(x, y, z, yaw, timeout=20):
+    """Fly to position with specified yaw, returns True if reached"""
+    start = time.time()
+    last_print = 0
+    while time.time() - start < timeout:
+        set_position_yaw_target(x, y, z, yaw)
+        px, py, pz, _, _, _ = get_local_position()
+        if px is not None:
+            dist = math.sqrt((px - x)**2 + (py - y)**2 + (pz - z)**2)
+            now = time.time()
+            if now - last_print > 1.0:
+                _, _, cur_yaw = get_attitude()
+                yaw_deg = math.degrees(cur_yaw) if cur_yaw else 0
+                print(f"    pos=({px:.2f}, {py:.2f}, {pz:.2f}) yaw={yaw_deg:.0f}° dist={dist:.2f}")
+                last_print = now
+            if dist < 0.3:
+                return True
+        time.sleep(0.05)
+    return False
+
+
+def hold_position(x, y, z, yaw, duration):
+    """Hold at position with yaw for specified duration"""
+    end_time = time.time() + duration
+    while time.time() < end_time:
+        set_position_yaw_target(x, y, z, yaw)
+        time.sleep(0.05)
+
+
+# ---- Check local position ----
 print("\nChecking local position estimate...")
-x, y, z = get_local_position()
+x, y, z, _, _, _ = get_local_position()
 if x is None:
     print("ERROR: No local position data. Is EKF2 running?")
     sys.exit(1)
 print(f"  Current position: ({x:.2f}, {y:.2f}, {z:.2f})")
 
-# ---- Send setpoints before OFFBOARD (PX4 requires this) ----
+# ---- Send setpoints before OFFBOARD ----
 print("\nSending initial setpoints (5 seconds)...")
 for i in range(100):
-    set_position_target(0.0, 0.0, -1.0)
+    set_position_yaw_target(0.0, 0.0, -FLIGHT_HEIGHT, 0)
     time.sleep(0.05)
 
 # ---- Switch to OFFBOARD ----
 print("Setting OFFBOARD mode...")
 set_mode_offboard()
-if wait_for_mode(6):  # PX4 OFFBOARD main mode = 6
+if wait_for_mode(6):
     print("  OFFBOARD mode confirmed!")
 else:
-    print("  WARNING: Could not confirm OFFBOARD mode, retrying...")
-    # Retry: send more setpoints and try again
+    print("  Retrying...")
     for _ in range(50):
-        set_position_target(0.0, 0.0, -1.0)
+        set_position_yaw_target(0.0, 0.0, -FLIGHT_HEIGHT, 0)
         time.sleep(0.05)
     set_mode_offboard()
-    if wait_for_mode(6):
-        print("  OFFBOARD mode confirmed on retry!")
-    else:
-        print("  WARNING: Still not in OFFBOARD mode, continuing...")
 
-# Keep sending setpoints while arming
+# ---- Arm ----
 print("Arming...")
 for i in range(20):
-    set_position_target(0.0, 0.0, -1.0)
+    set_position_yaw_target(0.0, 0.0, -FLIGHT_HEIGHT, 0)
     time.sleep(0.05)
 arm()
 
-# Keep sending setpoints and wait for arm
 armed = False
 for i in range(100):
-    set_position_target(0.0, 0.0, -1.0)
+    set_position_yaw_target(0.0, 0.0, -FLIGHT_HEIGHT, 0)
     msg = master.recv_match(type='HEARTBEAT', blocking=False)
     if msg and (msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
         armed = True
@@ -147,10 +180,10 @@ for i in range(100):
     time.sleep(0.05)
 
 if not armed:
-    print("  Normal arm failed, trying force arm...")
+    print("  Trying force arm...")
     arm(force=True)
     for i in range(100):
-        set_position_target(0.0, 0.0, -1.0)
+        set_position_yaw_target(0.0, 0.0, -FLIGHT_HEIGHT, 0)
         msg = master.recv_match(type='HEARTBEAT', blocking=False)
         if msg and (msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
             armed = True
@@ -160,47 +193,45 @@ if not armed:
 if armed:
     print("  Armed successfully!")
 else:
-    print("  ERROR: Failed to arm. Check 'commander check' in pxh.")
+    print("  ERROR: Failed to arm.")
     sys.exit(1)
 
-# ---- Fly the square ----
-# Square waypoints in NED (z negative = up)
+# ============ Square Trajectory with Yaw ============
+print("\n" + "="*50)
+print("SQUARE TRAJECTORY WITH YAW ROTATION")
+print(f"  Side: {SIDE_LENGTH}m, Height: {FLIGHT_HEIGHT}m")
+print("="*50)
+
+# Waypoints: (x, y, z, yaw)
+# z is negative in NED for altitude
+# yaw is the heading to face the next waypoint direction
+L = SIDE_LENGTH
+H = -FLIGHT_HEIGHT
+
 waypoints = [
-    (0.0, 0.0, -1.0),   # Takeoff / hover
-    (1.0, 0.0, -1.0),   # Forward 1m
-    (1.0, 1.0, -1.0),   # Right 1m
-    (0.0, 1.0, -1.0),   # Back 1m
-    (0.0, 0.0, -1.0),   # Return home
+    # (x, y, z, yaw_rad, description)
+    (0, 0, H, 0,                      "Takeoff (yaw=0°)"),
+    (L, 0, H, 0,                      "Corner 1 (yaw=0°, facing +X)"),
+    (L, 0, H, math.pi/2,              "Rotate to 90°"),
+    (L, L, H, math.pi/2,              "Corner 2 (yaw=90°, facing +Y)"),
+    (L, L, H, math.pi,                "Rotate to 180°"),
+    (0, L, H, math.pi,                "Corner 3 (yaw=180°, facing -X)"),
+    (0, L, H, -math.pi/2,             "Rotate to -90°"),
+    (0, 0, H, -math.pi/2,             "Corner 4 (yaw=-90°, facing -Y)"),
+    (0, 0, H, 0,                      "Rotate back to 0°"),
 ]
 
-last_print = 0
-for i, (wx, wy, wz) in enumerate(waypoints):
-    label = ["Takeoff/Hover", "Forward", "Right", "Back", "Return"][i]
-    print(f"\n[{i}] {label} -> ({wx}, {wy}, {wz})")
-    timeout = time.time() + 20
-    while time.time() < timeout:
-        set_position_target(wx, wy, wz)
-        x, y, z = get_local_position()
-        if x is not None:
-            dist = ((x - wx)**2 + (y - wy)**2 + (z - wz)**2) ** 0.5
-            # Print position every 2 seconds
-            now = time.time()
-            if now - last_print > 2.0:
-                print(f"  pos=({x:.2f}, {y:.2f}, {z:.2f}) dist={dist:.2f}")
-                last_print = now
-            if dist < 0.3:
-                print(f"  Reached! pos=({x:.2f}, {y:.2f}, {z:.2f}), holding 3s...")
-                hold_end = time.time() + 3
-                while time.time() < hold_end:
-                    set_position_target(wx, wy, wz)
-                    time.sleep(0.05)
-                break
-        time.sleep(0.05)
+for i, (wx, wy, wz, wyaw, desc) in enumerate(waypoints):
+    print(f"\n[{i}] {desc}")
+    print(f"    Target: ({wx:.1f}, {wy:.1f}, {wz:.1f}) yaw={math.degrees(wyaw):.0f}°")
+
+    if fly_to_position(wx, wy, wz, wyaw):
+        print(f"    Reached! Holding {CORNER_HOLD_TIME}s...")
+        hold_position(wx, wy, wz, wyaw, CORNER_HOLD_TIME)
     else:
-        if x is not None:
-            print(f"  Timeout. Last pos=({x:.2f}, {y:.2f}, {z:.2f})")
-        else:
-            print(f"  Timeout. No position data.")
+        px, py, pz, _, _, _ = get_local_position()
+        if px:
+            print(f"    Timeout. pos=({px:.2f}, {py:.2f}, {pz:.2f})")
 
 # ---- Land ----
 print("\nLanding...")
