@@ -94,8 +94,41 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+
+    <!-- ============================================== -->
+    <!-- Module Position Definitions                    -->
+    <!-- Physics: Joint follows this position           -->
+    <!-- Visual offset: Relative to physics position    -->
+    <!-- ============================================== -->
+
+    <!-- Module1 (MD0 Front-Left) -->
+    <frame name='module1_physics' attached_to='base_link'>
+      <pose>0.16 0.175 -0.02 0 0 0</pose>
+    </frame>
+
+    <!-- Module2 (MD1 Front-Right) -->
+    <frame name='module2_physics' attached_to='base_link'>
+      <pose>0.16 -0.175 -0.02 0 0 0</pose>
+    </frame>
+
+    <!-- Module3 (MD2 Rear-Left) -->
+    <frame name='module3_physics' attached_to='base_link'>
+      <pose>-0.16 0.175 -0.02 0 0 0</pose>
+    </frame>
+
+    <!-- Module4 (MD3 Rear-Right) -->
+    <frame name='module4_physics' attached_to='base_link'>
+      <pose>-0.16 -0.175 -0.02 0 0 0</pose>
+    </frame>
+
+    <!-- Visual offsets (relative to physics position) -->
+    <!-- Gimbal visual offset: (-0.001, -0.02, 0.065)   -->
+    <!-- Actuator visual offset: (0, 0.185, 0)         -->
+    <!-- Propeller visual offset: (0, 0, 0.035)        -->
+    <!-- ============================================== -->
+
     <joint name='module1_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.16 0.175 -0.02 0 0 0</pose>
+      <pose relative_to='module1_physics'>0 0 0 0 0 0</pose>
       <parent>base_link</parent>
       <child>module1_gimbal_link</child>
       <axis>
@@ -273,7 +306,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module2_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.16 -0.175 -0.02 0 0 0</pose>
+      <pose relative_to='module2_physics'>0 0 0 0 0 0</pose>
       <parent>base_link</parent>
       <child>module2_gimbal_link</child>
       <axis>
@@ -451,7 +484,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module3_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.16 0.175 -0.02 0 0 0</pose>
+      <pose relative_to='module3_physics'>0 0 0 0 0 0</pose>
       <parent>base_link</parent>
       <child>module3_gimbal_link</child>
       <axis>
@@ -629,7 +662,7 @@
       <gravity>true</gravity>
     </link>
     <joint name='module4_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.16 -0.175 -0.02 0 0 0</pose>
+      <pose relative_to='module4_physics'>0 0 0 0 0 0</pose>
       <parent>base_link</parent>
       <child>module4_gimbal_link</child>
       <axis>
@@ -906,30 +939,6 @@
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='imu_sensor_link' attached_to='imu_sensor_joint'>
-      <pose>0 0 0 0 0 0</pose>
-    </frame>
-    <frame name='rigid_base_link_module1_body_link' attached_to='base_link'>
-      <pose>0.16 0.16 0.0 0 0 0</pose>
-    </frame>
-    <frame name='module1_body_link' attached_to='rigid_base_link_module1_body_link'>
-      <pose>0 0 0 0 0 0</pose>
-    </frame>
-    <frame name='rigid_base_link_module2_body_link' attached_to='base_link'>
-      <pose>0.16 -0.16 0.0 0 0 0</pose>
-    </frame>
-    <frame name='module2_body_link' attached_to='rigid_base_link_module2_body_link'>
-      <pose>0 0 0 0 0 0</pose>
-    </frame>
-    <frame name='rigid_base_link_module3_body_link' attached_to='base_link'>
-      <pose>-0.16 0.16 0.0 0 0 0</pose>
-    </frame>
-    <frame name='module3_body_link' attached_to='rigid_base_link_module3_body_link'>
-      <pose>0 0 0 0 0 0</pose>
-    </frame>
-    <frame name='rigid_base_link_module4_body_link' attached_to='base_link'>
-      <pose>-0.16 -0.16 0.0 0 0 0</pose>
-    </frame>
-    <frame name='module4_body_link' attached_to='rigid_base_link_module4_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
   </model>
