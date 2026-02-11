@@ -70,8 +70,9 @@
           <ambient>0.25 0.25 0.25 1</ambient>
         </material>
       </visual>
+      <!-- Module1 (MD0 Front-Left) visual position -->
       <visual name='base_link_fixed_joint_lump__module1_body_link_visual_2'>
-        <pose>0.185 0.16 0 0 0 1.5707963267948959</pose>
+        <pose>0.1675 0.1825 -0.02 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -87,8 +88,9 @@
           <ambient>0 0 0 1</ambient>
         </material>
       </visual>
+      <!-- Module2 (MD1 Front-Right) visual position -->
       <visual name='base_link_fixed_joint_lump__module2_body_link_visual_3'>
-        <pose>0.185 -0.16 0 0 0 1.5707963267948959</pose>
+        <pose>0.1675 -0.172 -0.02 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -104,8 +106,9 @@
           <ambient>0 0 0 1</ambient>
         </material>
       </visual>
+      <!-- Module3 (MD2 Rear-Left) visual position -->
       <visual name='base_link_fixed_joint_lump__module3_body_link_visual_4'>
-        <pose>-0.185 0.16 0 0 0 0</pose>
+        <pose>-0.15 0.1825 -0.02 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -121,8 +124,9 @@
           <ambient>0 0 0 1</ambient>
         </material>
       </visual>
+      <!-- Module4 (MD3 Rear-Right) visual position -->
       <visual name='base_link_fixed_joint_lump__module4_body_link_visual_5'>
-        <pose>-0.185 -0.16 0 0 0 0</pose>
+        <pose>-0.15 -0.175 -0.02 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
