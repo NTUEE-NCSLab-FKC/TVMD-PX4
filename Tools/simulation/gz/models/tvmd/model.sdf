@@ -2,15 +2,15 @@
   <model name='tvmd'>
     <link name='base_link'>
       <inertial>
-        <pose>0.01390591051191776 -0.00055341193166726869 0.02051707341603063 0 0 0</pose>
-        <mass>4.8718421699999999</mass>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>1.4</mass>
         <inertia>
-          <ixx>0.14678592343825389</ixx>
-          <ixy>0.00037507058797052668</ixy>
-          <ixz>-0.001166404325738742</ixz>
-          <iyy>0.15377608730625311</iyy>
-          <iyz>-0.00020698456824991271</iyz>
-          <izz>0.28041029854143718</izz>
+          <ixx>0.02</ixx>
+          <ixy>0.0002778506938765993</ixy>
+          <ixz>-0.00050801012549722409</ixz>
+          <iyy>0.02</iyy>
+          <iyz>-0.0002130772702844956</iyz>
+          <izz>0.02</izz>
         </inertia>
       </inertial>
       <collision name='base_link_collision'>
@@ -54,8 +54,8 @@
           </mesh>
         </geometry>
         <material>
-          <diffuse>0.125 0.125 0.37500003 1</diffuse>
-          <ambient>0.125 0.125 0.37500003 1</ambient>
+          <diffuse>0.25 0.25 0.75000006 1</diffuse>
+          <ambient>0.25 0.25 0.75000006 1</ambient>
         </material>
       </visual>
       <visual name='base_link_fixed_joint_lump__imu_sensor_link_visual_1'>
@@ -68,78 +68,6 @@
         <material>
           <diffuse>0.25 0.25 0.25 1</diffuse>
           <ambient>0.25 0.25 0.25 1</ambient>
-        </material>
-      </visual>
-      <!-- Module1 (MD0 Front-Left) visual position -->
-      <visual name='base_link_fixed_joint_lump__module1_body_link_visual_2'>
-        <pose>0.1675 0.1825 -0.02 0 0 0</pose>
-        <geometry>
-          <mesh>
-            <scale>0.001 0.001 0.001</scale>
-            <uri>model://tvmd/meshes/agent/base_link.stl</uri>
-          </mesh>
-        </geometry>
-        <material>
-          <script>
-            <name>Gazebo/Black</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
-          <diffuse>0 0 0 1</diffuse>
-          <ambient>0 0 0 1</ambient>
-        </material>
-      </visual>
-      <!-- Module2 (MD1 Front-Right) visual position -->
-      <visual name='base_link_fixed_joint_lump__module2_body_link_visual_3'>
-        <pose>0.1675 -0.172 -0.02 0 0 0</pose>
-        <geometry>
-          <mesh>
-            <scale>0.001 0.001 0.001</scale>
-            <uri>model://tvmd/meshes/agent/base_link.stl</uri>
-          </mesh>
-        </geometry>
-        <material>
-          <script>
-            <name>Gazebo/Black</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
-          <diffuse>0 0 0 1</diffuse>
-          <ambient>0 0 0 1</ambient>
-        </material>
-      </visual>
-      <!-- Module3 (MD2 Rear-Left) visual position -->
-      <visual name='base_link_fixed_joint_lump__module3_body_link_visual_4'>
-        <pose>-0.15 0.1825 -0.02 0 0 0</pose>
-        <geometry>
-          <mesh>
-            <scale>0.001 0.001 0.001</scale>
-            <uri>model://tvmd/meshes/agent/base_link.stl</uri>
-          </mesh>
-        </geometry>
-        <material>
-          <script>
-            <name>Gazebo/Black</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
-          <diffuse>0 0 0 1</diffuse>
-          <ambient>0 0 0 1</ambient>
-        </material>
-      </visual>
-      <!-- Module4 (MD3 Rear-Right) visual position -->
-      <visual name='base_link_fixed_joint_lump__module4_body_link_visual_5'>
-        <pose>-0.15 -0.175 -0.02 0 0 0</pose>
-        <geometry>
-          <mesh>
-            <scale>0.001 0.001 0.001</scale>
-            <uri>model://tvmd/meshes/agent/base_link.stl</uri>
-          </mesh>
-        </geometry>
-        <material>
-          <script>
-            <name>Gazebo/Black</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
-          <diffuse>0 0 0 1</diffuse>
-          <ambient>0 0 0 1</ambient>
         </material>
       </visual>
       <sensor name='air_pressure_sensor' type='air_pressure'>
@@ -166,16 +94,15 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
-    <!-- Module1 joint follows body visual position -->
     <joint name='module1_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.1675 0.1825 -0.02 0 0 0</pose>
+      <pose relative_to='base_link'>0.16 0.175 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module1_gimbal_link</child>
       <axis>
         <xyz>0 1 0</xyz>
         <limit>
-          <lower>-1.570796326794897</lower>
-          <upper>1.570796326794897</upper>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
           <effort>30000</effort>
           <velocity>10</velocity>
         </limit>
@@ -202,7 +129,7 @@
         </inertia>
       </inertial>
       <collision name='module1_gimbal_link_fixed_joint_lump__module1_actuator_collision_collision'>
-        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <pose>0.001 -0.018 0.065 0 0 0</pose>
         <geometry>
           <cylinder>
             <length>0.40000000000000002</length>
@@ -211,7 +138,7 @@
         </geometry>
       </collision>
       <visual name='module1_gimbal_link_visual'>
-        <pose>0 0 0.065 0 0 0</pose>
+        <pose>-0.001 -0.02 0.065000000000000002 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -223,8 +150,8 @@
             <name>Gazebo/Gray</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>0.25 0.25 0.25 1</diffuse>
-          <ambient>0.25 0.25 0.25 1</ambient>
+          <diffuse>0.900000036 0.5625 0.25 1</diffuse>
+          <ambient>0.900000036 0.5625 0.25 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
@@ -265,7 +192,7 @@
         </inertia>
       </inertial>
       <visual name='module1_actuator_link_visual'>
-        <pose>0 0 0.065 0 0 0</pose>
+        <pose>0 0.185 0 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -277,8 +204,8 @@
             <name>Gazebo/Gray</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>0.25 0.25 0.25 1</diffuse>
-          <ambient>0.25 0.25 0.25 1</ambient>
+          <diffuse>1 0.25 0.25 1</diffuse>
+          <ambient>1 0.25 0.25 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
@@ -326,7 +253,7 @@
         </geometry>
       </collision>
       <visual name='module1_prop1_link_visual'>
-        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <pose>0 0 0.035000000000000003 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -338,23 +265,22 @@
             <name>Gazebo/Yellow</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>1 1 0 1</diffuse>
-          <ambient>1 1 0 1</ambient>
+          <diffuse>1 0.850000024 0.262499988 1</diffuse>
+          <ambient>1 0.850000024 0.262499988 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
-    <!-- Module2 joint follows body visual position -->
     <joint name='module2_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.1675 -0.172 -0.02 0 0 0</pose>
+      <pose relative_to='base_link'>0.16 -0.175 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module2_gimbal_link</child>
       <axis>
         <xyz>0 1 0</xyz>
         <limit>
-          <lower>-1.570796326794897</lower>
-          <upper>1.570796326794897</upper>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
           <effort>30000</effort>
           <velocity>10</velocity>
         </limit>
@@ -381,7 +307,7 @@
         </inertia>
       </inertial>
       <collision name='module2_gimbal_link_fixed_joint_lump__module2_actuator_collision_collision'>
-        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <pose>0.001 -0.017999999999999999 0.065000000000000002 0 0 0</pose>
         <geometry>
           <cylinder>
             <length>0.40000000000000002</length>
@@ -390,7 +316,7 @@
         </geometry>
       </collision>
       <visual name='module2_gimbal_link_visual'>
-        <pose>0 0 0.065 0 0 0</pose>
+        <pose>-0.001 -0.02 0.065000000000000002 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -402,8 +328,8 @@
             <name>Gazebo/Gray</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>0.25 0.25 0.25 1</diffuse>
-          <ambient>0.25 0.25 0.25 1</ambient>
+          <diffuse>0.900000036 0.5625 0.25 1</diffuse>
+          <ambient>0.900000036 0.5625 0.25 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
@@ -444,7 +370,7 @@
         </inertia>
       </inertial>
       <visual name='module2_actuator_link_visual'>
-        <pose>0 0 0.065 0 0 0</pose>
+        <pose>0 0.185 0 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -456,8 +382,8 @@
             <name>Gazebo/Gray</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>0.25 0.25 0.25 1</diffuse>
-          <ambient>0.25 0.25 0.25 1</ambient>
+          <diffuse>1 0.25 0.25 1</diffuse>
+          <ambient>1 0.25 0.25 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
@@ -505,7 +431,7 @@
         </geometry>
       </collision>
       <visual name='module2_prop1_link_visual'>
-        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <pose>0 0 0.035000000000000003 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -517,23 +443,22 @@
             <name>Gazebo/Yellow</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>1 1 0 1</diffuse>
-          <ambient>1 1 0 1</ambient>
+          <diffuse>1 0.850000024 0.262499988 1</diffuse>
+          <ambient>1 0.850000024 0.262499988 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
-    <!-- Module3 joint follows body visual position -->
     <joint name='module3_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.15 0.1825 -0.02 0 0 0</pose>
+      <pose relative_to='base_link'>-0.16 0.175 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module3_gimbal_link</child>
       <axis>
         <xyz>0 1 0</xyz>
         <limit>
-          <lower>-1.570796326794897</lower>
-          <upper>1.570796326794897</upper>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
           <effort>30000</effort>
           <velocity>10</velocity>
         </limit>
@@ -560,7 +485,7 @@
         </inertia>
       </inertial>
       <collision name='module3_gimbal_link_fixed_joint_lump__module3_actuator_collision_collision'>
-        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <pose>0.001 -0.017999999999999999 0.065000000000000002 0 0 0</pose>
         <geometry>
           <cylinder>
             <length>0.40000000000000002</length>
@@ -569,7 +494,7 @@
         </geometry>
       </collision>
       <visual name='module3_gimbal_link_visual'>
-        <pose>0 0 0.065 0 0 0</pose>
+        <pose>-0.001 -0.02 0.065000000000000002 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -581,8 +506,8 @@
             <name>Gazebo/Gray</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>0.25 0.25 0.25 1</diffuse>
-          <ambient>0.25 0.25 0.25 1</ambient>
+          <diffuse>0.900000036 0.5625 0.25 1</diffuse>
+          <ambient>0.900000036 0.5625 0.25 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
@@ -623,7 +548,7 @@
         </inertia>
       </inertial>
       <visual name='module3_actuator_link_visual'>
-        <pose>0 0 0.065 0 0 0</pose>
+        <pose>0 0.185 0 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -635,8 +560,8 @@
             <name>Gazebo/Gray</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>0.25 0.25 0.25 1</diffuse>
-          <ambient>0.25 0.25 0.25 1</ambient>
+          <diffuse>1 0.25 0.25 1</diffuse>
+          <ambient>1 0.25 0.25 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
@@ -684,7 +609,7 @@
         </geometry>
       </collision>
       <visual name='module3_prop1_link_visual'>
-        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <pose>0 0 0.035000000000000003 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -696,23 +621,22 @@
             <name>Gazebo/Yellow</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>1 1 0 1</diffuse>
-          <ambient>1 1 0 1</ambient>
+          <diffuse>1 0.850000024 0.262499988 1</diffuse>
+          <ambient>1 0.850000024 0.262499988 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
-    <!-- Module4 joint follows body visual position -->
     <joint name='module4_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.15 -0.175 -0.02 0 0 0</pose>
+      <pose relative_to='base_link'>-0.16 -0.175 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module4_gimbal_link</child>
       <axis>
         <xyz>0 1 0</xyz>
         <limit>
-          <lower>-1.570796326794897</lower>
-          <upper>1.570796326794897</upper>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
           <effort>30000</effort>
           <velocity>10</velocity>
         </limit>
@@ -739,7 +663,7 @@
         </inertia>
       </inertial>
       <collision name='module4_gimbal_link_fixed_joint_lump__module4_actuator_collision_collision'>
-        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <pose>0.001 -0.017999999999999999 0.065000000000000002 0 0 0</pose>
         <geometry>
           <cylinder>
             <length>0.40000000000000002</length>
@@ -748,7 +672,7 @@
         </geometry>
       </collision>
       <visual name='module4_gimbal_link_visual'>
-        <pose>0 0 0.065 0 0 0</pose>
+        <pose>-0.001 -0.02 0.065000000000000002 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -760,8 +684,8 @@
             <name>Gazebo/Gray</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>0.25 0.25 0.25 1</diffuse>
-          <ambient>0.25 0.25 0.25 1</ambient>
+          <diffuse>0.900000036 0.5625 0.25 1</diffuse>
+          <ambient>0.900000036 0.5625 0.25 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
@@ -802,7 +726,7 @@
         </inertia>
       </inertial>
       <visual name='module4_actuator_link_visual'>
-        <pose>0 0 0.065 0 0 0</pose>
+        <pose>0 0.185 0 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -814,8 +738,8 @@
             <name>Gazebo/Gray</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>0.25 0.25 0.25 1</diffuse>
-          <ambient>0.25 0.25 0.25 1</ambient>
+          <diffuse>1 0.25 0.25 1</diffuse>
+          <ambient>1 0.25 0.25 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
@@ -863,7 +787,7 @@
         </geometry>
       </collision>
       <visual name='module4_prop1_link_visual'>
-        <pose>0 0 0 1.5707963267948959 0 0</pose>
+        <pose>0 0 0.035000000000000003 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -875,8 +799,8 @@
             <name>Gazebo/Yellow</name>
             <uri>file://media/materials/scripts/gazebo.material</uri>
           </script>
-          <diffuse>1 1 0 1</diffuse>
-          <ambient>1 1 0 1</ambient>
+          <diffuse>1 0.850000024 0.262499988 1</diffuse>
+          <ambient>1 0.850000024 0.262499988 1</ambient>
         </material>
       </visual>
       <self_collide>false</self_collide>
@@ -985,25 +909,25 @@
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module1_body_link' attached_to='base_link'>
-      <pose>0.1675 0.1825 -0.02 0 0 0</pose>
+      <pose>0.16 0.16 0.0 0 0 0</pose>
     </frame>
     <frame name='module1_body_link' attached_to='rigid_base_link_module1_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module2_body_link' attached_to='base_link'>
-      <pose>0.1675 -0.172 -0.02 0 0 0</pose>
+      <pose>0.16 -0.16 0.0 0 0 0</pose>
     </frame>
     <frame name='module2_body_link' attached_to='rigid_base_link_module2_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module3_body_link' attached_to='base_link'>
-      <pose>-0.15 0.1825 -0.02 0 0 0</pose>
+      <pose>-0.16 0.16 0.0 0 0 0</pose>
     </frame>
     <frame name='module3_body_link' attached_to='rigid_base_link_module3_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module4_body_link' attached_to='base_link'>
-      <pose>-0.15 -0.175 -0.02 0 0 0</pose>
+      <pose>-0.16 -0.16 0.0 0 0 0</pose>
     </frame>
     <frame name='module4_body_link' attached_to='rigid_base_link_module4_body_link'>
       <pose>0 0 0 0 0 0</pose>
