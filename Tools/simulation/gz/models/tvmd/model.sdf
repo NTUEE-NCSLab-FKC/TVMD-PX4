@@ -166,8 +166,9 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <!-- Module1 joint follows body visual position -->
     <joint name='module1_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.185 0.16 0.068000000000000005 0 0 1.5707963267948959</pose>
+      <pose relative_to='base_link'>0.1675 0.1825 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module1_gimbal_link</child>
       <axis>
@@ -210,7 +211,7 @@
         </geometry>
       </collision>
       <visual name='module1_gimbal_link_visual'>
-        <pose>0 0 -0.068000000000000005 0 0 0</pose>
+        <pose>0 0 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -264,7 +265,7 @@
         </inertia>
       </inertial>
       <visual name='module1_actuator_link_visual'>
-        <pose>0 0 -0.068000000000000005 0 0 0</pose>
+        <pose>0 0 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -344,8 +345,9 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <!-- Module2 joint follows body visual position -->
     <joint name='module2_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.185 -0.16 0.068000000000000005 0 0 1.5707963267948959</pose>
+      <pose relative_to='base_link'>0.1675 -0.172 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module2_gimbal_link</child>
       <axis>
@@ -388,7 +390,7 @@
         </geometry>
       </collision>
       <visual name='module2_gimbal_link_visual'>
-        <pose>0 0 -0.068000000000000005 0 0 0</pose>
+        <pose>0 0 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -442,7 +444,7 @@
         </inertia>
       </inertial>
       <visual name='module2_actuator_link_visual'>
-        <pose>0 0 -0.068000000000000005 0 0 0</pose>
+        <pose>0 0 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -522,8 +524,9 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <!-- Module3 joint follows body visual position -->
     <joint name='module3_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.185 0.16 0.068000000000000005 0 0 0</pose>
+      <pose relative_to='base_link'>-0.15 0.1825 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module3_gimbal_link</child>
       <axis>
@@ -566,7 +569,7 @@
         </geometry>
       </collision>
       <visual name='module3_gimbal_link_visual'>
-        <pose>0 0 -0.068000000000000005 0 0 0</pose>
+        <pose>0 0 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -620,7 +623,7 @@
         </inertia>
       </inertial>
       <visual name='module3_actuator_link_visual'>
-        <pose>0 0 -0.068000000000000005 0 0 0</pose>
+        <pose>0 0 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -700,8 +703,9 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <!-- Module4 joint follows body visual position -->
     <joint name='module4_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.185 -0.16 0.068000000000000005 0 0 0</pose>
+      <pose relative_to='base_link'>-0.15 -0.175 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module4_gimbal_link</child>
       <axis>
@@ -744,7 +748,7 @@
         </geometry>
       </collision>
       <visual name='module4_gimbal_link_visual'>
-        <pose>0 0 -0.068000000000000005 0 0 0</pose>
+        <pose>0 0 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -798,7 +802,7 @@
         </inertia>
       </inertial>
       <visual name='module4_actuator_link_visual'>
-        <pose>0 0 -0.068000000000000005 0 0 0</pose>
+        <pose>0 0 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -981,25 +985,25 @@
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module1_body_link' attached_to='base_link'>
-      <pose>0.185 0.16 0 0 0 1.5707963267948959</pose>
+      <pose>0.1675 0.1825 -0.02 0 0 0</pose>
     </frame>
     <frame name='module1_body_link' attached_to='rigid_base_link_module1_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module2_body_link' attached_to='base_link'>
-      <pose>0.185 -0.16 0 0 0 1.5707963267948959</pose>
+      <pose>0.1675 -0.172 -0.02 0 0 0</pose>
     </frame>
     <frame name='module2_body_link' attached_to='rigid_base_link_module2_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module3_body_link' attached_to='base_link'>
-      <pose>-0.185 0.16 0 0 0 0</pose>
+      <pose>-0.15 0.1825 -0.02 0 0 0</pose>
     </frame>
     <frame name='module3_body_link' attached_to='rigid_base_link_module3_body_link'>
       <pose>0 0 0 0 0 0</pose>
     </frame>
     <frame name='rigid_base_link_module4_body_link' attached_to='base_link'>
-      <pose>-0.185 -0.16 0 0 0 0</pose>
+      <pose>-0.15 -0.175 -0.02 0 0 0</pose>
     </frame>
     <frame name='module4_body_link' attached_to='rigid_base_link_module4_body_link'>
       <pose>0 0 0 0 0 0</pose>
