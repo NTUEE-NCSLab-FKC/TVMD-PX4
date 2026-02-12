@@ -94,8 +94,10 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <!-- Module 1 (Front-Left): Physics at (0.16, 0.175), Visual at (0.1675, 0.1825) -->
+    <!-- Visual offset: (0.0075, 0.0075, 0) -->
     <joint name='module1_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.1675 0.1825 -0.02 0 0 0</pose>
+      <pose relative_to='base_link'>0.16 0.175 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module1_gimbal_link</child>
       <axis>
@@ -138,7 +140,7 @@
         </geometry>
       </collision>
       <visual name='module1_gimbal_link_visual'>
-        <pose>-0.001 -0.02 0.065 0 0 0</pose>
+        <pose>0.0065 -0.0125 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -192,7 +194,7 @@
         </inertia>
       </inertial>
       <visual name='module1_actuator_link_visual'>
-        <pose>0 0.185 0 1.5708 0 0</pose>
+        <pose>0.0075 0.1925 0 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -253,7 +255,7 @@
         </geometry>
       </collision>
       <visual name='module1_prop1_link_visual'>
-        <pose>0 0 0.035 1.5708 0 0</pose>
+        <pose>0.0075 0.0075 0.035 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -272,8 +274,10 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <!-- Module 2 (Front-Right): Physics at (0.16, -0.175), Visual at (0.1675, -0.172) -->
+    <!-- Visual offset: (0.0075, 0.003, 0) -->
     <joint name='module2_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>0.1675 -0.172 -0.02 0 0 0</pose>
+      <pose relative_to='base_link'>0.16 -0.175 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module2_gimbal_link</child>
       <axis>
@@ -316,7 +320,7 @@
         </geometry>
       </collision>
       <visual name='module2_gimbal_link_visual'>
-        <pose>-0.001 -0.02 0.065000000000000002 0 0 0</pose>
+        <pose>0.0065 -0.017 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -370,7 +374,7 @@
         </inertia>
       </inertial>
       <visual name='module2_actuator_link_visual'>
-        <pose>0 0.185 0 1.5708 0 0</pose>
+        <pose>0.0075 0.188 0 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -431,7 +435,7 @@
         </geometry>
       </collision>
       <visual name='module2_prop1_link_visual'>
-        <pose>0 0 0.035000000000000003 1.5708 0 0</pose>
+        <pose>0.0075 0.003 0.035 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -450,8 +454,10 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <!-- Module 3 (Rear-Left): Physics at (-0.16, 0.175), Visual at (-0.15, 0.1825) -->
+    <!-- Visual offset: (0.01, 0.0075, 0) -->
     <joint name='module3_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.15 0.1825 -0.02 0 0 0</pose>
+      <pose relative_to='base_link'>-0.16 0.175 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module3_gimbal_link</child>
       <axis>
@@ -494,7 +500,7 @@
         </geometry>
       </collision>
       <visual name='module3_gimbal_link_visual'>
-        <pose>-0.001 -0.02 0.065000000000000002 0 0 0</pose>
+        <pose>0.009 -0.0125 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -548,7 +554,7 @@
         </inertia>
       </inertial>
       <visual name='module3_actuator_link_visual'>
-        <pose>0 0.185 0 1.5708 0 0</pose>
+        <pose>0.01 0.1925 0 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -609,7 +615,7 @@
         </geometry>
       </collision>
       <visual name='module3_prop1_link_visual'>
-        <pose>0 0 0.035000000000000003 1.5708 0 0</pose>
+        <pose>0.01 0.0075 0.035 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -628,8 +634,10 @@
       <self_collide>false</self_collide>
       <gravity>true</gravity>
     </link>
+    <!-- Module 4 (Rear-Right): Physics at (-0.16, -0.175), Visual at (-0.15, -0.175) -->
+    <!-- Visual offset: (0.01, 0, 0) -->
     <joint name='module4_body_gimbal_joint' type='revolute'>
-      <pose relative_to='base_link'>-0.15 -0.175 -0.02 0 0 0</pose>
+      <pose relative_to='base_link'>-0.16 -0.175 -0.02 0 0 0</pose>
       <parent>base_link</parent>
       <child>module4_gimbal_link</child>
       <axis>
@@ -672,7 +680,7 @@
         </geometry>
       </collision>
       <visual name='module4_gimbal_link_visual'>
-        <pose>-0.001 -0.02 0.065000000000000002 0 0 0</pose>
+        <pose>0.009 -0.02 0.065 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -726,7 +734,7 @@
         </inertia>
       </inertial>
       <visual name='module4_actuator_link_visual'>
-        <pose>0 0.185 0 1.5708 0 0</pose>
+        <pose>0.01 0.185 0 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
@@ -787,7 +795,7 @@
         </geometry>
       </collision>
       <visual name='module4_prop1_link_visual'>
-        <pose>0 0 0.035000000000000003 1.5708 0 0</pose>
+        <pose>0.01 0 0.035 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
