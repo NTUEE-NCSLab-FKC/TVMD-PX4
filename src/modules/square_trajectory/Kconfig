@@ -1,6 +1,0 @@
-menuconfig MODULES_SQUARE_TRAJECTORY
-	bool "square_trajectory"
-	default n
-	---help---
-		Enable square trajectory test module.
-		Flies a 1m x 1m square at 1m altitude with yaw rotation.

@@ -31,6 +31,16 @@
  *
  ****************************************************************************/
 
+/**
+ * @file TrajectoryTest.hpp
+ * @brief Trajectory test runner module
+ *
+ * Usage:
+ *   trajectory_test start <name>   (e.g. square, circle)
+ *   trajectory_test status
+ *   trajectory_test stop
+ */
+
 #pragma once
 
 #include <px4_platform_common/defines.h>
@@ -43,20 +53,20 @@
 #include <uORB/topics/trajectory_setpoint.h>
 #include <uORB/topics/offboard_control_mode.h>
 #include <uORB/topics/vehicle_command.h>
-#include <uORB/topics/vehicle_command_ack.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_status.h>
 
-#include <matrix/math.hpp>
 #include <mathlib/mathlib.h>
+
+#include "TrajectoryBase.hpp"
 
 using namespace time_literals;
 
-class SquareTrajectory : public ModuleBase<SquareTrajectory>, public px4::ScheduledWorkItem
+class TrajectoryTest : public ModuleBase<TrajectoryTest>, public px4::ScheduledWorkItem
 {
 public:
-	SquareTrajectory();
-	~SquareTrajectory() override = default;
+	TrajectoryTest();
+	~TrajectoryTest() override;
 
 	static int task_spawn(int argc, char *argv[]);
 	static int custom_command(int argc, char *argv[]);
@@ -65,53 +75,40 @@ public:
 	int print_status() override;
 	bool init();
 
+	/** Set which trajectory to fly (must be called before init) */
+	void set_trajectory(TrajectoryBase *traj) { _trajectory = traj; }
+
+	/** Store trajectory name from argv for task_spawn */
+	static char s_trajectory_name[32];
+
 private:
 	void Run() override;
 
-	void publish_trajectory_setpoint(float x, float y, float z, float yaw);
+	void publish_trajectory_setpoint(const Waypoint &wp);
 	void publish_offboard_control_mode();
 	void send_vehicle_command(uint16_t cmd, float p1 = NAN, float p2 = NAN, float p3 = NAN);
 
 	enum class State {
 		IDLE,
-		SEND_SETPOINTS,   // pre-send setpoints before switching to offboard
-		OFFBOARD,         // switch to offboard mode
-		ARM,              // arm vehicle
-		TAKEOFF,          // fly to initial hover point
-		FLY_TO_WP,        // fly to next waypoint
-		HOLD_AT_WP,       // hold position at waypoint
-		LAND,             // switch to land mode
+		SEND_SETPOINTS,
+		OFFBOARD,
+		ARM,
+		TAKEOFF,
+		FLY_TO_WP,
+		HOLD_AT_WP,
+		LAND,
 		DONE
 	};
 
 	State _state{State::IDLE};
-
-	// Square trajectory configuration
-	static constexpr float SIDE_LENGTH = 1.0f;
-	static constexpr float FLIGHT_HEIGHT = -1.0f; // NED: negative = up
-	static constexpr float POSITION_THRESHOLD = 0.3f;
-	static constexpr float HOLD_TIME_S = 2.0f;
-	static constexpr int PRE_OFFBOARD_SETPOINTS = 100; // ~5s at 20Hz
-
-	// Waypoints: {x, y, z, yaw}
-	// Square with yaw rotation at corners
-	static constexpr int NUM_WAYPOINTS = 9;
-	float _waypoints[NUM_WAYPOINTS][4] = {
-		{0.0f,          0.0f,          FLIGHT_HEIGHT, 0.0f},                // takeoff
-		{SIDE_LENGTH,   0.0f,          FLIGHT_HEIGHT, 0.0f},                // corner 1 (yaw=0)
-		{SIDE_LENGTH,   0.0f,          FLIGHT_HEIGHT, M_PI_F / 2.0f},      // rotate to 90
-		{SIDE_LENGTH,   SIDE_LENGTH,   FLIGHT_HEIGHT, M_PI_F / 2.0f},      // corner 2 (yaw=90)
-		{SIDE_LENGTH,   SIDE_LENGTH,   FLIGHT_HEIGHT, M_PI_F},             // rotate to 180
-		{0.0f,          SIDE_LENGTH,   FLIGHT_HEIGHT, M_PI_F},             // corner 3 (yaw=180)
-		{0.0f,          SIDE_LENGTH,   FLIGHT_HEIGHT, -M_PI_F / 2.0f},    // rotate to -90
-		{0.0f,          0.0f,          FLIGHT_HEIGHT, -M_PI_F / 2.0f},    // corner 4 (yaw=-90)
-		{0.0f,          0.0f,          FLIGHT_HEIGHT, 0.0f},               // rotate back to 0
-	};
+	TrajectoryBase *_trajectory{nullptr};
 
 	int _current_wp{0};
 	int _pre_offboard_count{0};
 	hrt_abstime _hold_start{0};
 	hrt_abstime _state_start{0};
+
+	static constexpr int PRE_OFFBOARD_SETPOINTS = 100; // 5s at 20Hz
 
 	// uORB publications
 	uORB::Publication<trajectory_setpoint_s>    _trajectory_setpoint_pub{ORB_ID(trajectory_setpoint)};

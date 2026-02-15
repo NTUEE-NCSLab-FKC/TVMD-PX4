@@ -31,42 +31,72 @@
  *
  ****************************************************************************/
 
-/**
- * @file SquareTrajectory.cpp
- *
- * Fly a 1m x 1m square at 1m altitude with yaw rotation at corners.
- * Usage: square_trajectory start
- *
- * Sequence:
- *   1. Send setpoints for 5s (required before switching to offboard)
- *   2. Switch to OFFBOARD mode
- *   3. Arm
- *   4. Fly square trajectory with yaw rotation at each corner
- *   5. Land
- */
-
-#include "SquareTrajectory.hpp"
+#include "TrajectoryTest.hpp"
 #include <drivers/drv_hrt.h>
 #include <px4_platform_common/log.h>
+#include <string.h>
 
-SquareTrajectory::SquareTrajectory() :
+// Include all trajectory definitions
+#include "trajectories/SquareTrajectory.hpp"
+#include "trajectories/CircleTrajectory.hpp"
+
+// Static storage for trajectory name passed via argv
+char TrajectoryTest::s_trajectory_name[32] = {};
+
+/**
+ * @brief Create trajectory by name
+ * @return Heap-allocated trajectory, or nullptr if not found
+ *
+ * To add a new trajectory:
+ *   1. Create trajectories/MyTrajectory.hpp
+ *   2. #include it above
+ *   3. Add an else-if branch below
+ */
+static TrajectoryBase *create_trajectory(const char *name)
+{
+	if (strcmp(name, "square") == 0) {
+		return new SquareTrajectory();
+
+	} else if (strcmp(name, "circle") == 0) {
+		return new CircleTrajectory();
+	}
+
+	// Add new trajectories here:
+	// } else if (strcmp(name, "figure8") == 0) {
+	//     return new FigureEightTrajectory();
+	// }
+
+	return nullptr;
+}
+
+TrajectoryTest::TrajectoryTest() :
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers)
 {
 }
 
-bool SquareTrajectory::init()
+TrajectoryTest::~TrajectoryTest()
 {
+	delete _trajectory;
+}
+
+bool TrajectoryTest::init()
+{
+	if (!_trajectory) {
+		PX4_ERR("No trajectory set");
+		return false;
+	}
+
 	_state = State::SEND_SETPOINTS;
 	_pre_offboard_count = 0;
 	_current_wp = 0;
 	_state_start = hrt_absolute_time();
 
 	ScheduleOnInterval(50_ms); // 20 Hz
-	PX4_INFO("Starting square trajectory...");
+	PX4_INFO("Starting trajectory: %s (%d waypoints)", _trajectory->name(), _trajectory->num_waypoints());
 	return true;
 }
 
-void SquareTrajectory::publish_offboard_control_mode()
+void TrajectoryTest::publish_offboard_control_mode()
 {
 	offboard_control_mode_s ocm{};
 	ocm.position = true;
@@ -78,25 +108,25 @@ void SquareTrajectory::publish_offboard_control_mode()
 	_offboard_control_mode_pub.publish(ocm);
 }
 
-void SquareTrajectory::publish_trajectory_setpoint(float x, float y, float z, float yaw)
+void TrajectoryTest::publish_trajectory_setpoint(const Waypoint &wp)
 {
 	trajectory_setpoint_s sp{};
-	sp.position[0] = x;
-	sp.position[1] = y;
-	sp.position[2] = z;
+	sp.position[0] = wp.x;
+	sp.position[1] = wp.y;
+	sp.position[2] = wp.z;
 	sp.velocity[0] = NAN;
 	sp.velocity[1] = NAN;
 	sp.velocity[2] = NAN;
 	sp.acceleration[0] = NAN;
 	sp.acceleration[1] = NAN;
 	sp.acceleration[2] = NAN;
-	sp.yaw = yaw;
+	sp.yaw = wp.yaw;
 	sp.yawspeed = NAN;
 	sp.timestamp = hrt_absolute_time();
 	_trajectory_setpoint_pub.publish(sp);
 }
 
-void SquareTrajectory::send_vehicle_command(uint16_t cmd, float p1, float p2, float p3)
+void TrajectoryTest::send_vehicle_command(uint16_t cmd, float p1, float p2, float p3)
 {
 	vehicle_command_s vcmd{};
 	vcmd.command = cmd;
@@ -116,7 +146,7 @@ void SquareTrajectory::send_vehicle_command(uint16_t cmd, float p1, float p2, fl
 	_vehicle_command_pub.publish(vcmd);
 }
 
-void SquareTrajectory::Run()
+void TrajectoryTest::Run()
 {
 	if (should_exit()) {
 		ScheduleClear();
@@ -124,24 +154,17 @@ void SquareTrajectory::Run()
 		return;
 	}
 
-	// Always publish offboard control mode and current setpoint to keep offboard alive
+	const int num_wps = _trajectory->num_waypoints();
+
+	// Keep offboard alive by publishing control mode + setpoint
 	if (_state != State::DONE && _state != State::IDLE && _state != State::LAND) {
 		publish_offboard_control_mode();
 
-		// Keep publishing current target
-		if (_current_wp >= 0 && _current_wp < NUM_WAYPOINTS) {
-			publish_trajectory_setpoint(
-				_waypoints[_current_wp][0],
-				_waypoints[_current_wp][1],
-				_waypoints[_current_wp][2],
-				_waypoints[_current_wp][3]);
-		} else {
-			// Default: hover at origin
-			publish_trajectory_setpoint(0.0f, 0.0f, FLIGHT_HEIGHT, 0.0f);
-		}
+		int wp_idx = (_current_wp >= 0 && _current_wp < num_wps) ? _current_wp : 0;
+		publish_trajectory_setpoint(_trajectory->waypoint(wp_idx));
 	}
 
-	// Get current vehicle state
+	// Read vehicle state
 	vehicle_status_s vehicle_status{};
 	_vehicle_status_sub.copy(&vehicle_status);
 
@@ -154,11 +177,10 @@ void SquareTrajectory::Run()
 		break;
 
 	case State::SEND_SETPOINTS:
-		// Must send setpoints for a while before switching to offboard
 		_pre_offboard_count++;
 
 		if (_pre_offboard_count >= PRE_OFFBOARD_SETPOINTS) {
-			PX4_INFO("Pre-offboard setpoints sent (%d). Switching to OFFBOARD...", _pre_offboard_count);
+			PX4_INFO("Pre-offboard done (%d setpoints). Switching to OFFBOARD...", _pre_offboard_count);
 			_state = State::OFFBOARD;
 			_state_start = hrt_absolute_time();
 		}
@@ -166,49 +188,46 @@ void SquareTrajectory::Run()
 		break;
 
 	case State::OFFBOARD:
-		// Send OFFBOARD mode command
-		// VEHICLE_CMD_DO_SET_MODE: param1=base_mode, param2=custom_main_mode
-		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1.0f, 6.0f); // 6 = OFFBOARD
+		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1.0f, 6.0f); // 6=OFFBOARD
 
 		if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_OFFBOARD) {
-			PX4_INFO("OFFBOARD mode confirmed. Arming...");
+			PX4_INFO("OFFBOARD confirmed. Arming...");
 			_state = State::ARM;
 			_state_start = hrt_absolute_time();
 
 		} else if (hrt_elapsed_time(&_state_start) > 10_s) {
-			PX4_ERR("Failed to enter OFFBOARD mode. Aborting.");
+			PX4_ERR("OFFBOARD timeout. Aborting.");
 			_state = State::DONE;
 		}
 
 		break;
 
 	case State::ARM:
-		// VEHICLE_CMD_COMPONENT_ARM_DISARM: param1=1(arm), param2=21196(force)
 		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0f, 21196.0f);
 
 		if (vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
-			PX4_INFO("Armed! Taking off to %.1fm...", (double)(-FLIGHT_HEIGHT));
+			PX4_INFO("Armed! Taking off...");
 			_current_wp = 0;
 			_state = State::TAKEOFF;
 			_state_start = hrt_absolute_time();
 
 		} else if (hrt_elapsed_time(&_state_start) > 10_s) {
-			PX4_ERR("Failed to arm. Aborting.");
+			PX4_ERR("Arm timeout. Aborting.");
 			_state = State::DONE;
 		}
 
 		break;
 
-	case State::TAKEOFF:
-		// Wait to reach first waypoint (hover point)
+	case State::TAKEOFF: {
 		if (local_pos.xy_valid && local_pos.z_valid) {
-			float dx = local_pos.x - _waypoints[0][0];
-			float dy = local_pos.y - _waypoints[0][1];
-			float dz = local_pos.z - _waypoints[0][2];
+			Waypoint wp0 = _trajectory->waypoint(0);
+			float dx = local_pos.x - wp0.x;
+			float dy = local_pos.y - wp0.y;
+			float dz = local_pos.z - wp0.z;
 			float dist = sqrtf(dx * dx + dy * dy + dz * dz);
 
-			if (dist < POSITION_THRESHOLD) {
-				PX4_INFO("Takeoff complete. Starting square trajectory.");
+			if (dist < _trajectory->position_threshold()) {
+				PX4_INFO("Takeoff complete. Starting %s trajectory.", _trajectory->name());
 				_current_wp = 1;
 				_state = State::FLY_TO_WP;
 				_state_start = hrt_absolute_time();
@@ -220,73 +239,103 @@ void SquareTrajectory::Run()
 		}
 
 		break;
+	}
 
-	case State::FLY_TO_WP:
+	case State::FLY_TO_WP: {
 		if (local_pos.xy_valid && local_pos.z_valid) {
-			float dx = local_pos.x - _waypoints[_current_wp][0];
-			float dy = local_pos.y - _waypoints[_current_wp][1];
-			float dz = local_pos.z - _waypoints[_current_wp][2];
+			Waypoint wp = _trajectory->waypoint(_current_wp);
+			float dx = local_pos.x - wp.x;
+			float dy = local_pos.y - wp.y;
+			float dz = local_pos.z - wp.z;
 			float dist = sqrtf(dx * dx + dy * dy + dz * dz);
 
-			if (dist < POSITION_THRESHOLD) {
-				PX4_INFO("[WP %d/%d] Reached (%.2f, %.2f, %.2f) yaw=%.0f deg. Holding %.1fs...",
-					 _current_wp, NUM_WAYPOINTS - 1,
+			if (dist < _trajectory->position_threshold()) {
+				PX4_INFO("[WP %d/%d] Reached (%.2f, %.2f, %.2f) yaw=%.0f deg",
+					 _current_wp, num_wps - 1,
 					 (double)local_pos.x, (double)local_pos.y, (double)local_pos.z,
-					 (double)(math::degrees(_waypoints[_current_wp][3])),
-					 (double)HOLD_TIME_S);
+					 (double)math::degrees(wp.yaw));
 				_hold_start = hrt_absolute_time();
 				_state = State::HOLD_AT_WP;
 
-			} else if (hrt_elapsed_time(&_state_start) > 30_s) {
-				PX4_WARN("[WP %d] Timeout (dist=%.2f). Moving on.", _current_wp, (double)dist);
+			} else if (hrt_elapsed_time(&_state_start) > (hrt_abstime)(_trajectory->waypoint_timeout() * 1e6f)) {
+				PX4_WARN("[WP %d] Timeout (dist=%.2f). Continuing.", _current_wp, (double)dist);
 				_hold_start = hrt_absolute_time();
 				_state = State::HOLD_AT_WP;
 			}
 		}
 
 		break;
+	}
 
-	case State::HOLD_AT_WP:
-		if (hrt_elapsed_time(&_hold_start) > (hrt_abstime)(HOLD_TIME_S * 1e6f)) {
+	case State::HOLD_AT_WP: {
+		Waypoint wp = _trajectory->waypoint(_current_wp);
+		hrt_abstime hold_us = (hrt_abstime)(wp.hold_time * 1e6f);
+
+		if (hrt_elapsed_time(&_hold_start) > hold_us) {
 			_current_wp++;
 
-			if (_current_wp >= NUM_WAYPOINTS) {
-				PX4_INFO("Square trajectory complete! Landing...");
+			if (_current_wp >= num_wps) {
+				PX4_INFO("%s trajectory complete! Landing...", _trajectory->name());
 				_state = State::LAND;
 
 			} else {
-				PX4_INFO("[WP %d/%d] Flying to (%.1f, %.1f) yaw=%.0f deg...",
-					 _current_wp, NUM_WAYPOINTS - 1,
-					 (double)_waypoints[_current_wp][0],
-					 (double)_waypoints[_current_wp][1],
-					 (double)(math::degrees(_waypoints[_current_wp][3])));
+				Waypoint next = _trajectory->waypoint(_current_wp);
+				PX4_INFO("[WP %d/%d] -> (%.2f, %.2f) yaw=%.0f deg",
+					 _current_wp, num_wps - 1,
+					 (double)next.x, (double)next.y,
+					 (double)math::degrees(next.yaw));
 				_state = State::FLY_TO_WP;
 				_state_start = hrt_absolute_time();
 			}
 		}
 
 		break;
+	}
 
 	case State::LAND:
-		// Switch to AUTO.LAND: main_mode=4(AUTO), sub_mode=6(LAND)
+		// AUTO.LAND: main_mode=4(AUTO), sub_mode=6(LAND)
 		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1.0f, 4.0f, 6.0f);
 		PX4_INFO("Land command sent.");
 		_state = State::DONE;
 		break;
 
 	case State::DONE:
-		PX4_INFO("Trajectory finished. Stopping module.");
+		PX4_INFO("Done. Module stopping.");
 		ScheduleClear();
 		exit_and_cleanup();
 		return;
 	}
 }
 
-int SquareTrajectory::task_spawn(int argc, char *argv[])
+int TrajectoryTest::task_spawn(int argc, char *argv[])
 {
-	SquareTrajectory *instance = new SquareTrajectory();
+	// Parse trajectory name from argv
+	const char *traj_name = "square"; // default
+
+	// argv: ["start", "square"] or just ["start"]
+	for (int i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "start") != 0 &&
+		    strcmp(argv[i], "stop") != 0 &&
+		    strcmp(argv[i], "status") != 0) {
+			traj_name = argv[i];
+			break;
+		}
+	}
+
+	strncpy(s_trajectory_name, traj_name, sizeof(s_trajectory_name) - 1);
+	s_trajectory_name[sizeof(s_trajectory_name) - 1] = '\0';
+
+	TrajectoryBase *trajectory = create_trajectory(s_trajectory_name);
+
+	if (!trajectory) {
+		PX4_ERR("Unknown trajectory: '%s'. Available: square, circle", s_trajectory_name);
+		return PX4_ERROR;
+	}
+
+	TrajectoryTest *instance = new TrajectoryTest();
 
 	if (instance) {
+		instance->set_trajectory(trajectory);
 		_object.store(instance);
 		_task_id = task_id_is_work_queue;
 
@@ -296,6 +345,7 @@ int SquareTrajectory::task_spawn(int argc, char *argv[])
 
 	} else {
 		PX4_ERR("alloc failed");
+		delete trajectory;
 	}
 
 	delete instance;
@@ -305,7 +355,7 @@ int SquareTrajectory::task_spawn(int argc, char *argv[])
 	return PX4_ERROR;
 }
 
-int SquareTrajectory::print_status()
+int TrajectoryTest::print_status()
 {
 	const char *state_str = "UNKNOWN";
 
@@ -321,16 +371,20 @@ int SquareTrajectory::print_status()
 	case State::DONE:           state_str = "DONE"; break;
 	}
 
-	PX4_INFO("State: %s, WP: %d/%d", state_str, _current_wp, NUM_WAYPOINTS - 1);
+	PX4_INFO("Trajectory: %s | State: %s | WP: %d/%d",
+		 _trajectory ? _trajectory->name() : "none",
+		 state_str,
+		 _current_wp,
+		 _trajectory ? _trajectory->num_waypoints() - 1 : 0);
 	return 0;
 }
 
-int SquareTrajectory::custom_command(int argc, char *argv[])
+int TrajectoryTest::custom_command(int argc, char *argv[])
 {
 	return print_usage("unknown command");
 }
 
-int SquareTrajectory::print_usage(const char *reason)
+int TrajectoryTest::print_usage(const char *reason)
 {
 	if (reason) {
 		PX4_WARN("%s\n", reason);
@@ -339,37 +393,32 @@ int SquareTrajectory::print_usage(const char *reason)
 	PRINT_MODULE_DESCRIPTION(
 		R"DESCR_STR(
 ### Description
-Fly a 1m x 1m square trajectory at 1m altitude with yaw rotation at corners.
+Trajectory test runner. Flies predefined trajectories using OFFBOARD mode.
 
-Uses OFFBOARD mode with position + yaw setpoints in NED frame.
-
-Sequence:
-  1. Pre-send setpoints (5s)
-  2. Switch to OFFBOARD mode
-  3. Arm (force)
-  4. Fly square: (0,0) -> (1,0) -> (1,1) -> (0,1) -> (0,0)
-  5. At each corner, rotate yaw to face next direction
-  6. Land
+Available trajectories:
+  square   - 1m x 1m square with yaw rotation at corners
+  circle   - 1m radius circle with tangent yaw
 
 ### Usage
-Start the trajectory:
-$ square_trajectory start
+$ trajectory_test start square
+$ trajectory_test start circle
+$ trajectory_test status
+$ trajectory_test stop
 
-Check status:
-$ square_trajectory status
-
-Stop:
-$ square_trajectory stop
+### Adding new trajectories
+1. Create trajectories/MyTrajectory.hpp inheriting TrajectoryBase
+2. Include and register in TrajectoryTest.cpp create_trajectory()
 )DESCR_STR");
 
-	PRINT_MODULE_USAGE_NAME("square_trajectory", "modules");
-	PRINT_MODULE_USAGE_COMMAND("start");
+	PRINT_MODULE_USAGE_NAME("trajectory_test", "modules");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("start", "Start trajectory (default: square)");
+	PRINT_MODULE_USAGE_ARG("square|circle", "Trajectory name", true);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 
 	return 0;
 }
 
-extern "C" __EXPORT int square_trajectory_main(int argc, char *argv[])
+extern "C" __EXPORT int trajectory_test_main(int argc, char *argv[])
 {
-	return SquareTrajectory::main(argc, argv);
+	return TrajectoryTest::main(argc, argv);
 }

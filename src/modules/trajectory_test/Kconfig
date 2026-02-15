@@ -1,0 +1,7 @@
+menuconfig MODULES_TRAJECTORY_TEST
+	bool "trajectory_test"
+	default n
+	---help---
+		Enable trajectory test runner module.
+		Flies predefined trajectories (square, circle, etc.) using OFFBOARD mode.
+		Usage: trajectory_test start <name>
