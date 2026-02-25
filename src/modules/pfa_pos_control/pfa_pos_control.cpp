@@ -261,7 +261,7 @@ void PFAPOSControl::Run()
 
 			// Maximum XY velocity (m/s) - can be tuned via parameter
 			const float max_vel_xy = 2.0f;
-			const float max_yaw_rate = 5.0f;  // rad/s
+			const float max_yaw_rate = 2.0f;  // rad/s
 
 			// Velocity control gain for manual mode
 			// This compensates for the low PFA_GAIN_X_D/Y_D values (0.05) which are tuned for position control
@@ -271,8 +271,23 @@ void PFAPOSControl::Run()
 			// Convert stick to velocity commands (NED frame)
 			// pitch stick forward (+1) = fly forward (positive X in NED)
 			// roll stick right (+1) = fly right (positive Y in NED)
-			const float vel_x_cmd = _manual_control_setpoint.pitch * max_vel_xy;  // forward/backward
-			const float vel_y_cmd = _manual_control_setpoint.roll * max_vel_xy;   // left/right
+			// const float vel_x_cmd = _manual_control_setpoint.pitch * max_vel_xy;  // forward/backward
+			// const float vel_y_cmd = _manual_control_setpoint.roll * max_vel_xy;   // left/right
+
+			// Convert stick to velocity commands (heading-relative, then rotate to NED frame)
+			// pitch stick forward (+1) = fly toward heading direction
+			// roll stick right (+1) = fly 90° right of heading direction
+			const float vel_x_body = _manual_control_setpoint.pitch * max_vel_xy;
+			const float vel_y_body = _manual_control_setpoint.roll  * max_vel_xy;
+
+			// Rotate body-frame velocity to NED world frame using current yaw
+			const Quatf q_att_now(_vehicle_attitude.q);
+			const Eulerf euler_att_now(q_att_now);
+			const float yaw_now = euler_att_now(2);
+
+			const float vel_x_cmd = cosf(yaw_now) * vel_x_body - sinf(yaw_now) * vel_y_body;
+			const float vel_y_cmd = sinf(yaw_now) * vel_x_body + cosf(yaw_now) * vel_y_body;
+
 
 			// Get current velocity from local position
 			const float vel_x_cur = vlocal_pos.vx;

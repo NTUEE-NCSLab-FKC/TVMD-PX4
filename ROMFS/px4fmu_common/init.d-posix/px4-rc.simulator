@@ -48,7 +48,7 @@ elif [ "$PX4_SIMULATOR" = "gz" ] || [ "$(param show -q SIM_GZ_EN)" = "1" ]; then
 	fi
 
 	if [ -n "${PX4_HOME_ALT}" ]; then
-		param set SIM_GZ_HOME_ALT ${PX4_HOME_LON}
+		param set SIM_GZ_HOME_ALT ${PX4_HOME_ALT}
 	fi
 
 	# source generated gz_env.sh for GZ_SIM_RESOURCE_PATH

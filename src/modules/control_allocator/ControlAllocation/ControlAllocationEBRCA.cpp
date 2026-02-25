@@ -166,7 +166,7 @@ ControlAllocationEBRCA::calcualte_bundled_pseudo_inverse(ControlVector &u_in)
 
 		// Design inward tilt target configuration
 		PseudoForceVector f_desired_tilt;
-		const float target_tilt_angle_deg = 0.0f;  // 15 degrees inward tilt
+		const float target_tilt_angle_deg = 15.0f;  // 15 degrees inward tilt
 		design_inward_tilt_pte(_f, f_desired_tilt, target_tilt_angle_deg);
 
 		// Apply nullspace projection and scaling

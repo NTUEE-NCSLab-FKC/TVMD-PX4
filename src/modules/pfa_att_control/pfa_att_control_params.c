@@ -128,7 +128,7 @@ PARAM_DEFINE_FLOAT(VEH_AGENT_IYY, 0.0f);
  *
  * @group PFA Attitude Control
  */
-PARAM_DEFINE_FLOAT(VEH_AGENT_IZZ, 0.0f);
+PARAM_DEFINE_FLOAT(VEH_AGENT_IZZ, 0.01f);
 // 0.0178f
 
 /**
@@ -151,7 +151,7 @@ PARAM_DEFINE_FLOAT(VEH_NAV_IYY, 0.02f);
  *
  * @group PFA Attitude Control
  */
-PARAM_DEFINE_FLOAT(VEH_NAV_IZZ, 0.02f); // 0.0214f
+PARAM_DEFINE_FLOAT(VEH_NAV_IZZ, 0.2f); // 0.0214f
 
 /**
  * Mass of a single agent in Kg

@@ -64,7 +64,7 @@ param set-default CA_MD2_X_GR 1.0
 param set-default CA_MD2_Y_GR 1.0
 
 
-aram set-default CA_MD3_PX -0.16     # Rear-Right (changed from -0.215)
+param set-default CA_MD3_PX -0.16     # Rear-Right (changed from -0.215)
 param set-default CA_MD3_PY -0.16      # (changed from -0.215)
 param set-default CA_MD3_PZ 0
 param set-default CA_MD3_AZ 0
