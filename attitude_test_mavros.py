@@ -3,16 +3,34 @@
 MAVROS Attitude Test in SITL
 Takeoff -> Hover -> Roll/Pitch/Yaw attitude tests -> Land
 
-Attitude test sequence:
-  Roll  +45° / -45°  (5s each)
-  Pitch +45° / -45°  (5s each)
-  Yaw   +90° / -90°  (5s each)
+Architecture
+============
+                setpoint_position/local          trajectory_setpoint
+  MAVROS  ──────────────────────────────────>  pfa_pos_control  ──> vehicle_attitude_setpoint
+          ──── setpoint_raw/attitude ─────>  (roll/pitch/yaw)         (thrust_body computed
+                  (roll/pitch/yaw only)       read here by            from position error)
+                                              pfa_pos_control          │
+                                                                       ▼
+                                                               pfa_att_control
+                                                              (torque + thrust allocation)
 
-Uses ENU coordinate frame (MAVROS default):
-  X = East, Y = North, Z = Up
+MAVROS publishes two streams simultaneously:
+  1. setpoint_position/local  – keeps PX4 in position-control OFFBOARD mode so that
+                                pfa_pos_control runs and computes the gravity-compensating
+                                3-D thrust_body in the body NED frame.
+  2. setpoint_raw/attitude    – writes vehicle_attitude_setpoint.{roll,pitch,yaw}_body
+                                which pfa_pos_control reads (ext_att_sp) to use as
+                                attitude_des instead of the default (0, 0, yaw).
+
+No manual thrust value is chosen in this script; pfa_pos_control owns all thrust.
+
+Attitude test sequence (5 s each):
+  Roll  +45° / -45°
+  Pitch +45° / -45°
+  Yaw   +90° / -90°
 
 Usage:
-  Terminal 1: make px4_sitl gz_tvmd          (or gz_iris for standard drone)
+  Terminal 1: make px4_sitl gz_tvmd
   Terminal 2: roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
   Terminal 3: python3 attitude_test_mavros.py
 """
@@ -21,7 +39,7 @@ import rospy
 import math
 import sys
 
-from geometry_msgs.msg import PoseStamped, Vector3, Quaternion
+from geometry_msgs.msg import PoseStamped, Quaternion
 from mavros_msgs.msg import State, AttitudeTarget
 from mavros_msgs.srv import CommandBool, CommandBoolRequest
 from mavros_msgs.srv import SetMode, SetModeRequest
@@ -29,10 +47,9 @@ from std_msgs.msg import Header
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 # ============ Configuration ============
-FLIGHT_HEIGHT  = 1.0   # Takeoff / hover height (meters)
-HOLD_TIME      = 5.0   # Seconds to hold each attitude
-HOVER_THRUST   = 0.7   # Normalised thrust at level hover (0.0 – 1.0)
-TAKEOFF_TIMEOUT = 30.0  # Max seconds to reach target altitude
+FLIGHT_HEIGHT   = 1.0    # Hover height (m, ENU +z = up)
+HOLD_TIME       = 5.0    # Seconds to hold each attitude
+TAKEOFF_TIMEOUT = 30.0   # Max seconds to reach target altitude
 
 # ============ Global State ============
 current_state = State()
@@ -56,7 +73,7 @@ def pose_cb(msg):
 # ─────────────────────────────────────────────
 
 def make_pose_stamped(x, y, z, yaw=0.0):
-    """Position setpoint in ENU map frame."""
+    """Position setpoint in ENU map frame (setpoint_position/local)."""
     pose = PoseStamped()
     pose.header.stamp    = rospy.Time.now()
     pose.header.frame_id = "map"
@@ -71,17 +88,30 @@ def make_pose_stamped(x, y, z, yaw=0.0):
     return pose
 
 
-def make_attitude_target(roll, pitch, yaw, thrust):
-    """Attitude setpoint (body frame). Ignores body-rate fields."""
+def make_attitude_target(roll, pitch, yaw):
+    """
+    Attitude-only setpoint (setpoint_raw/attitude).
+
+    type_mask = 0b00111111 = 63
+      Bits 0-2: ignore body rate (wx, wy, wz)
+      Bits 3-5: ignore attitude  – NOT set, so attitude IS used
+      Bit  6  : ignore thrust    – set, so thrust is ignored
+
+    This tells pfa_pos_control the desired roll/pitch/yaw while leaving
+    thrust_body computation entirely to pfa_pos_control.
+    """
     att = AttitudeTarget()
     att.header            = Header()
     att.header.stamp      = rospy.Time.now()
     att.header.frame_id   = "base_footprint"
-    att.type_mask         = 7          # ignore body rate; use orientation + thrust
-    att.body_rate         = Vector3()
+    # Ignore body-rate AND thrust; use only orientation.
+    att.type_mask         = AttitudeTarget.IGNORE_ROLL_RATE \
+                          | AttitudeTarget.IGNORE_PITCH_RATE \
+                          | AttitudeTarget.IGNORE_YAW_RATE \
+                          | AttitudeTarget.IGNORE_THRUST
     q = quaternion_from_euler(roll, pitch, yaw)
-    att.orientation       = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
-    att.thrust            = max(0.0, min(1.0, thrust))
+    att.orientation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
+    att.thrust = 0.0  # ignored by type_mask
     return att
 
 
@@ -90,14 +120,13 @@ def make_attitude_target(roll, pitch, yaw, thrust):
 # ─────────────────────────────────────────────
 
 def takeoff_and_hover(pos_pub, target_z, timeout=TAKEOFF_TIMEOUT):
-    """Publish position setpoints until target altitude is reached."""
+    """Use position setpoints until target altitude is reached."""
     rate       = rospy.Rate(20)
     start      = rospy.Time.now()
     last_print = rospy.Time.now()
 
     while not rospy.is_shutdown():
-        elapsed = (rospy.Time.now() - start).to_sec()
-        if elapsed > timeout:
+        if (rospy.Time.now() - start).to_sec() > timeout:
             rospy.logwarn("Takeoff timeout!")
             return False
 
@@ -125,27 +154,34 @@ def hold_position(pos_pub, x, y, z, yaw, duration):
         rate.sleep()
 
 
-def hold_attitude(att_pub, roll, pitch, yaw, thrust, duration, label):
+def hold_attitude(pos_pub, att_pub, roll, pitch, yaw, duration, label):
     """
-    Stream attitude setpoint for <duration> seconds.
-    Prints current IMU attitude every second for monitoring.
+    Stream attitude command for <duration> seconds.
+
+    Both topics are published each cycle:
+      - setpoint_position/local  keeps pfa_pos_control in the thrust loop
+      - setpoint_raw/attitude    carries the desired roll/pitch/yaw so
+                                 pfa_pos_control uses them as attitude_des
     """
-    rate     = rospy.Rate(20)
-    end_time = rospy.Time.now() + rospy.Duration(duration)
+    rate       = rospy.Rate(20)
+    end_time   = rospy.Time.now() + rospy.Duration(duration)
     last_print = rospy.Time.now()
 
     while not rospy.is_shutdown() and rospy.Time.now() < end_time:
-        att_pub.publish(make_attitude_target(roll, pitch, yaw, thrust))
+        # Position setpoint at origin keeps pfa_pos_control active
+        pos_pub.publish(make_pose_stamped(0.0, 0.0, FLIGHT_HEIGHT, yaw))
+        # Attitude setpoint carries desired roll/pitch/yaw
+        att_pub.publish(make_attitude_target(roll, pitch, yaw))
 
         remaining = (end_time - rospy.Time.now()).to_sec()
         if pose_received and (rospy.Time.now() - last_print).to_sec() >= 1.0:
             q = current_pose.pose.orientation
-            r, p, y = euler_from_quaternion([q.x, q.y, q.z, q.w])
+            r, p, y_cur = euler_from_quaternion([q.x, q.y, q.z, q.w])
             rospy.loginfo(
                 f"  [{label}] "
                 f"roll={math.degrees(r):+6.1f}°  "
                 f"pitch={math.degrees(p):+6.1f}°  "
-                f"yaw={math.degrees(y):+7.1f}°  "
+                f"yaw={math.degrees(y_cur):+7.1f}°  "
                 f"({remaining:.1f}s left)"
             )
             last_print = rospy.Time.now()
@@ -160,17 +196,14 @@ def hold_attitude(att_pub, roll, pitch, yaw, thrust, duration, label):
 def main():
     rospy.init_node('attitude_test_mavros', anonymous=True)
 
-    # Subscribers
-    rospy.Subscriber('/mavros/state',                  State,        state_cb)
-    rospy.Subscriber('/mavros/local_position/pose',    PoseStamped,  pose_cb)
+    rospy.Subscriber('/mavros/state',               State,       state_cb)
+    rospy.Subscriber('/mavros/local_position/pose', PoseStamped, pose_cb)
 
-    # Publishers
     pos_pub = rospy.Publisher('/mavros/setpoint_position/local',
                               PoseStamped,    queue_size=10)
     att_pub = rospy.Publisher('/mavros/setpoint_raw/attitude',
                               AttitudeTarget, queue_size=10)
 
-    # Services
     rospy.loginfo("Waiting for MAVROS services...")
     rospy.wait_for_service('/mavros/cmd/arming', timeout=30)
     rospy.wait_for_service('/mavros/set_mode',   timeout=30)
@@ -179,37 +212,30 @@ def main():
 
     rate = rospy.Rate(20)
 
-    # ── Wait for FCU connection ──────────────────────────────────────
     rospy.loginfo("Waiting for FCU connection...")
     while not rospy.is_shutdown() and not current_state.connected:
         rate.sleep()
     rospy.loginfo("FCU connected!")
 
-    # ── Wait for local position estimate ────────────────────────────
     rospy.loginfo("Waiting for local position estimate...")
     timeout = rospy.Time.now() + rospy.Duration(10)
     while not rospy.is_shutdown() and not pose_received:
         if rospy.Time.now() > timeout:
-            rospy.logerr("No local position data. Is EKF2 running?")
+            rospy.logerr("No local position. Is EKF2 running?")
             sys.exit(1)
         rate.sleep()
 
-    px = current_pose.pose.position.x
-    py = current_pose.pose.position.y
-    pz = current_pose.pose.position.z
-    rospy.loginfo(f"  Start position (ENU): ({px:.2f}, {py:.2f}, {pz:.2f})")
-
-    # ── Pre-stream setpoints before OFFBOARD ────────────────────────
-    rospy.loginfo("Streaming initial position setpoints (5 s)...")
+    # ── Pre-stream position setpoints before requesting OFFBOARD ────
+    rospy.loginfo("Streaming initial setpoints (5 s)...")
     for _ in range(100):
         if rospy.is_shutdown():
             return
         pos_pub.publish(make_pose_stamped(0.0, 0.0, FLIGHT_HEIGHT))
         rate.sleep()
 
-    # ── Request OFFBOARD mode ────────────────────────────────────────
+    # ── OFFBOARD ────────────────────────────────────────────────────
     rospy.loginfo("Requesting OFFBOARD mode...")
-    offb_req      = SetModeRequest()
+    offb_req             = SetModeRequest()
     offb_req.custom_mode = 'OFFBOARD'
     last_req = rospy.Time.now()
 
@@ -227,7 +253,7 @@ def main():
     rospy.loginfo("OFFBOARD mode active!")
 
     # ── Arm ──────────────────────────────────────────────────────────
-    rospy.loginfo("Arming motors...")
+    rospy.loginfo("Arming...")
     last_req = rospy.Time.now()
 
     while not rospy.is_shutdown() and not current_state.armed:
@@ -248,7 +274,7 @@ def main():
     # ── Takeoff ──────────────────────────────────────────────────────
     rospy.loginfo(f"\nTaking off to {FLIGHT_HEIGHT:.1f} m...")
     if not takeoff_and_hover(pos_pub, FLIGHT_HEIGHT):
-        rospy.logerr("Takeoff failed – aborting.")
+        rospy.logerr("Takeoff failed.")
         sys.exit(1)
 
     rospy.loginfo("Hovering at origin. Stabilising 3 s...")
@@ -258,40 +284,37 @@ def main():
     rospy.loginfo("")
     rospy.loginfo("=" * 55)
     rospy.loginfo("  ATTITUDE TEST SEQUENCE")
-    rospy.loginfo(f"  Hold time per step : {HOLD_TIME:.0f} s")
-    rospy.loginfo(f"  Base hover thrust  : {HOVER_THRUST:.2f}")
+    rospy.loginfo("  Thrust allocation: pfa_pos_control + pfa_att_control")
+    rospy.loginfo(f"  Hold time per step: {HOLD_TIME:.0f} s")
     rospy.loginfo("=" * 55)
 
     DEG45 = math.radians(45.0)
     DEG90 = math.radians(90.0)
 
-    # When tilted, vertical thrust component = thrust * cos(angle).
-    # Compensate so net vertical force stays the same.
-    T_45  = min(HOVER_THRUST / math.cos(DEG45), 1.0)   # ≈ 0.99 for T=0.7
-    T_lvl = HOVER_THRUST                                # yaw keeps level attitude
-
-    # (roll, pitch, yaw, thrust, label)
+    # (roll, pitch, yaw, label)
+    # Thrust is NOT specified here — pfa_pos_control computes it from
+    # position error + gravity compensation, rotated into body frame.
     test_sequence = [
         # ── Roll ────────────────────────────────────────────────────
-        ( DEG45,   0.0,    0.0,  T_45,  "Roll  +45°"),
-        (-DEG45,   0.0,    0.0,  T_45,  "Roll  -45°"),
+        ( DEG45,   0.0,    0.0,  "Roll  +45°"),
+        (-DEG45,   0.0,    0.0,  "Roll  -45°"),
         # ── Pitch ───────────────────────────────────────────────────
-        (  0.0,  DEG45,    0.0,  T_45,  "Pitch +45°"),
-        (  0.0, -DEG45,    0.0,  T_45,  "Pitch -45°"),
-        # ── Yaw (body stays level; only heading changes) ─────────────
-        (  0.0,    0.0,  DEG90,  T_lvl, "Yaw   +90°"),
-        (  0.0,    0.0, -DEG90,  T_lvl, "Yaw   -90°"),
+        (  0.0,  DEG45,    0.0,  "Pitch +45°"),
+        (  0.0, -DEG45,    0.0,  "Pitch -45°"),
+        # ── Yaw ─────────────────────────────────────────────────────
+        (  0.0,    0.0,  DEG90,  "Yaw   +90°"),
+        (  0.0,    0.0, -DEG90,  "Yaw   -90°"),
     ]
 
-    for roll, pitch, yaw, thrust, label in test_sequence:
-        rospy.loginfo(f"\n>>> {label}  (thrust={thrust:.3f})")
-        hold_attitude(att_pub, roll, pitch, yaw, thrust, HOLD_TIME, label)
+    for roll, pitch, yaw, label in test_sequence:
+        rospy.loginfo(f"\n>>> {label}")
+        hold_attitude(pos_pub, att_pub, roll, pitch, yaw, HOLD_TIME, label)
 
-        # Brief level-hover recovery between steps via position control
+        # Level-hover recovery via position control (2 s)
         rospy.loginfo("  Recovery hover (2 s)...")
         hold_position(pos_pub, 0.0, 0.0, FLIGHT_HEIGHT, 0.0, 2.0)
 
-    # ── Level off before landing ─────────────────────────────────────
+    # ── Return to level hover before landing ─────────────────────────
     rospy.loginfo("\nAll attitude tests complete. Level hover 3 s...")
     hold_position(pos_pub, 0.0, 0.0, FLIGHT_HEIGHT, 0.0, 3.0)
 

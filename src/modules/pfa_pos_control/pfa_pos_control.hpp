@@ -140,6 +140,10 @@ private:
 	uORB::Subscription _trajectory_setpoint_sub{ORB_ID(trajectory_setpoint)};
 	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription _vcontrol_mode_sub{ORB_ID(vehicle_control_mode)};
+	/** Desired attitude angles (roll/pitch/yaw) written by MAVROS via setpoint_raw/attitude.
+	 *  pfa_pos_control reads these in OFFBOARD mode to accept external attitude commands
+	 *  while still computing the correct 3-D thrust_body via position control. */
+	uORB::Subscription _ext_att_sp_sub{ORB_ID(vehicle_attitude_setpoint)};
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_local_position_sub{this, ORB_ID(vehicle_local_position)};
 
@@ -147,6 +151,7 @@ private:
 	trajectory_setpoint_s _trajectory_setpoint{};
 	manual_control_setpoint_s _manual_control_setpoint{};
 	vehicle_control_mode_s _vcontrol_mode{};
+	vehicle_attitude_setpoint_s _ext_att_sp{};
 
 	perf_counter_t	_loop_perf;
 

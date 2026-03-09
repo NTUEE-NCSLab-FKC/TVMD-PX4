@@ -252,6 +252,7 @@ void PFAPOSControl::Run()
 		_vehicle_attitude_sub.update(&_vehicle_attitude);
 		_trajectory_setpoint_sub.update(&_trajectory_setpoint);
 		_manual_control_setpoint_sub.update(&_manual_control_setpoint);
+		_ext_att_sp_sub.update(&_ext_att_sp);
 
 		_update_position_control_enable_time();
 
@@ -362,7 +363,14 @@ void PFAPOSControl::Run()
 
 			// The flying state including the rampup phase
 			if (flying) {
-				const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw); // roll and pitch = 0, yaw from trajectory setpoint
+				// Use roll/pitch/yaw from external attitude setpoint if MAVROS has published
+				// one recently (via setpoint_raw/attitude).  Fall back to level (roll=pitch=0)
+				// with yaw from trajectory_setpoint when no external attitude command is active.
+				const hrt_abstime ext_age_us = hrt_absolute_time() - _ext_att_sp.timestamp;
+				const bool ext_att_fresh = (_ext_att_sp.timestamp > 0) && (ext_age_us < 500_ms);
+				const Vector3f attitude_des = ext_att_fresh
+					? Vector3f(_ext_att_sp.roll_body, _ext_att_sp.pitch_body, _ext_att_sp.yaw_body)
+					: Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw);
 				// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
 
 				if (ramping_up) {
