@@ -513,6 +513,14 @@ void ControlAllocationEBRCA::inverse_transform_on_tangent_plane(
 	matrix::Vector3f raw0;
 	inverse_transform(raw0, f0_i);
 
+	// Guard: Jacobian determinant ∝ raw0(2)² — when thrust is near zero the Jacobian
+	// is singular and inv(J) explodes, producing enormous servo rate demands.
+	// Use the same threshold as inverse_transform (2×f_min).
+	if (raw0(2) < f_min * 2.0f) {
+		raw.setZero();
+		return;
+	}
+
 	matrix::Vector3f ff = prob_len * f_delta_i / f_delta_i.norm();
 
 	const float jac_fa[3][3] = {

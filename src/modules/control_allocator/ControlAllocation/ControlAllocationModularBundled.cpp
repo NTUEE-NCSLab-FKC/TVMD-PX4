@@ -232,7 +232,9 @@ void ControlAllocationModularBundled::inverse_transform(
 	matrix::Vector3f &raw, const matrix::Vector3f &f_i) const
 {
 	// TODO: To tackle negative z-axis forces
-	const float minimum_z_thrust = f_min;
+	// Use 2x f_min as guard to avoid numerical instability: when thrust is near f_min,
+	// the sensitivity dη_x/d(f_y) = -1/(T_f·cos(η_x)) diverges, causing servo oscillation.
+	const float minimum_z_thrust = f_min * 2.0f;
 
 	// T_f = || f_i ||_2
 	raw(2) = f_i.norm();
@@ -241,8 +243,14 @@ void ControlAllocationModularBundled::inverse_transform(
 		raw.setZero();
 	}
 	else {
+		// Clamp asin argument to [-sin(σ_η), sin(σ_η)] to prevent near-singularity.
+		// At low thrust, small lateral forces can drive the ratio toward ±1 where
+		// asin sensitivity diverges. Clamping ensures we stay in well-conditioned region.
+		const float max_sin_arg = sinf(sigma_eta[0]);  // sin(45°) = 0.707
+		const float asin_arg = math::constrain(-f_i(1) / raw(2), -max_sin_arg, max_sin_arg);
+
 		// eta_x = asin(-y, T_f)
-		raw(0) = std::asin(-f_i(1) / raw(2));
+		raw(0) = std::asin(asin_arg);
 
 		// eta_y = atan2(x, z)
 		raw(1) = std::atan2(f_i(0), f_i(2));
