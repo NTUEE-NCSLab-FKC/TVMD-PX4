@@ -240,7 +240,12 @@ void ControlAllocationModularBundled::inverse_transform(
 	raw(2) = f_i.norm();
 
 	if ((raw(2) <= minimum_z_thrust) || (f_i(2) <= minimum_z_thrust)) {
-		raw.setZero();
+		// Zero servo angles only — do NOT zero raw(2) (motor thrust).
+		// Setting raw(2)=0 would command the motor to idle, causing an altitude drop
+		// and subsequent over-correction oscillation each time thrust crosses the threshold.
+		// raw(2) = f_i.norm() is already set above; preserve it for the motor command.
+		raw(0) = 0.0f;
+		raw(1) = 0.0f;
 	}
 	else {
 		// Clamp asin argument to [-sin(σ_η), sin(σ_η)] to prevent near-singularity.
@@ -297,6 +302,20 @@ void ControlAllocationModularBundled::generate_actuator_sp(const PseudoForceVect
 		// Servos: 4, 5, 6, 7, 8, 9, 10, 11 (consecutive)
 		const uint8_t motor_idx = i; // change to 1 motor per module, motor index: 0, 1, 2, 3
 		const uint8_t eta_idx = NUM_MODULES + 2*i;  // offset = 4, servo index: 4, 6, 8, 10
+
+		// Hard rate limiter: clamp servo angle change per step regardless of allocation result.
+		// This is the last line of defense against oscillation from any source, including:
+		//   - PTE (Post-Torque Enhancement) modifications that run after calc_local_admissible()
+		//     and thus bypass the EBRCA rate constraints entirely.
+		//   - Threshold transitions when thrust crosses minimum_z_thrust.
+		//   - Any numerical issue in the allocation producing large angle jumps.
+		if (_rate_constraints_considered) {
+			const float prev_eta_x = _prev_actuator_sp(eta_idx);
+			const float prev_eta_y = _prev_actuator_sp(eta_idx + 1);
+			raw(0) = math::constrain(raw(0), prev_eta_x - r_sigma_eta[0], prev_eta_x + r_sigma_eta[0]);
+			raw(1) = math::constrain(raw(1), prev_eta_y - r_sigma_eta[1], prev_eta_y + r_sigma_eta[1]);
+		}
+
 		_actuator_sp(motor_idx  ) = raw(2);  // Tf    (N)
 		// _actuator_sp(motor_idx+1) = 0;    // Td    (Nm)
 		_actuator_sp(eta_idx  )   = raw(0);  // eta_x (rad)
