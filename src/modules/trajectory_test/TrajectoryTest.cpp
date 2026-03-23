@@ -39,6 +39,7 @@
 // Include all trajectory definitions
 #include "trajectories/SquareTrajectory.hpp"
 #include "trajectories/CircleTrajectory.hpp"
+#include "trajectories/HoverTrajectory.hpp"
 
 // Static storage for trajectory name passed via argv
 char TrajectoryTest::s_trajectory_name[32] = {};
@@ -59,6 +60,9 @@ static TrajectoryBase *create_trajectory(const char *name)
 
 	} else if (strcmp(name, "circle") == 0) {
 		return new CircleTrajectory();
+
+	} else if (strcmp(name, "hover") == 0) {
+		return new HoverTrajectory();
 	}
 
 	// Add new trajectories here:
@@ -328,7 +332,7 @@ int TrajectoryTest::task_spawn(int argc, char *argv[])
 	TrajectoryBase *trajectory = create_trajectory(s_trajectory_name);
 
 	if (!trajectory) {
-		PX4_ERR("Unknown trajectory: '%s'. Available: square, circle", s_trajectory_name);
+		PX4_ERR("Unknown trajectory: '%s'. Available: square, circle, hover", s_trajectory_name);
 		return PX4_ERROR;
 	}
 
@@ -398,6 +402,7 @@ Trajectory test runner. Flies predefined trajectories using OFFBOARD mode.
 Available trajectories:
   square   - 1m x 1m square with yaw rotation at corners
   circle   - 1m radius circle with tangent yaw
+  hover    - hover in place at 0.5m for 10s
 
 ### Usage
 $ trajectory_test start square
@@ -412,7 +417,7 @@ $ trajectory_test stop
 
 	PRINT_MODULE_USAGE_NAME("trajectory_test", "modules");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("start", "Start trajectory (default: square)");
-	PRINT_MODULE_USAGE_ARG("square|circle", "Trajectory name", true);
+	PRINT_MODULE_USAGE_ARG("square|circle|hover", "Trajectory name", true);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 
 	return 0;
