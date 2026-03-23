@@ -140,6 +140,10 @@ private:
 	uORB::Subscription _trajectory_setpoint_sub{ORB_ID(trajectory_setpoint)};
 	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription _vcontrol_mode_sub{ORB_ID(vehicle_control_mode)};
+	// Reads the vehicle_attitude_setpoint written by mavlink_receiver (SET_ATTITUDE_TARGET).
+	// Used to pick up external roll/pitch commands in OFFBOARD mode without pfa_pos_control
+	// clobbering them with manual_control_setpoint.roll/pitch (which is 0 when no RC).
+	uORB::Subscription _ext_att_sp_sub{ORB_ID(vehicle_attitude_setpoint)};
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_local_position_sub{this, ORB_ID(vehicle_local_position)};
 
@@ -147,6 +151,14 @@ private:
 	trajectory_setpoint_s _trajectory_setpoint{};
 	manual_control_setpoint_s _manual_control_setpoint{};
 	vehicle_control_mode_s _vcontrol_mode{};
+
+	// Timestamp of the last vehicle_attitude_setpoint published by this module.
+	// Used to distinguish our own writes from mavlink_receiver's writes on the same topic.
+	hrt_abstime _att_sp_last_write_time{0};
+	// Cache of the most recent external roll/pitch setpoint from mavlink_receiver.
+	float _ext_roll_des{0.0f};
+	float _ext_pitch_des{0.0f};
+	hrt_abstime _ext_att_sp_recv_time{0};
 
 	perf_counter_t	_loop_perf;
 

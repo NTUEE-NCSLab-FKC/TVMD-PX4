@@ -130,6 +130,7 @@ void PFAPOSControl::publish_attitude_setpoint(
 	const Vector3f output_thrust = _checkAllFinite(thrust_sp);
 	output_thrust.copyTo(vehicle_attitude_setpoint.thrust_body);
 	_att_sp_pub.publish(vehicle_attitude_setpoint);
+	_att_sp_last_write_time = vehicle_attitude_setpoint.timestamp;
 }
 
 
@@ -315,8 +316,29 @@ void PFAPOSControl::Run()
 
 			// The flying state including the rampup phase
 			if (flying) {
+				// In OFFBOARD mode, use roll/pitch from SET_ATTITUDE_TARGET (written by
+				// mavlink_receiver to vehicle_attitude_setpoint) when available and fresh.
+				// We detect "external" writes by comparing the topic timestamp against the
+				// last time this module itself published — any message newer than our own
+				// last write must have come from mavlink_receiver.
+				// Yaw still comes from manual_control_setpoint, which SITL's virtual-RC
+				// mechanism populates from trajectory_setpoint.yaw.
+				if (_vcontrol_mode.flag_control_offboard_enabled) {
+					vehicle_attitude_setpoint_s ext_att{};
+					if (_ext_att_sp_sub.copy(&ext_att)
+					    && ext_att.timestamp > _att_sp_last_write_time
+					    && hrt_elapsed_time(&ext_att.timestamp) < 500_ms) {
+						_ext_roll_des        = ext_att.roll_body;
+						_ext_pitch_des       = ext_att.pitch_body;
+						_ext_att_sp_recv_time = ext_att.timestamp;
+					}
+				}
+				const bool ext_att_valid = _vcontrol_mode.flag_control_offboard_enabled
+				                           && hrt_elapsed_time(&_ext_att_sp_recv_time) < 500_ms;
+				const float roll_des  = ext_att_valid ? _ext_roll_des  : _manual_control_setpoint.roll;
+				const float pitch_des = ext_att_valid ? _ext_pitch_des : _manual_control_setpoint.pitch;
 				// const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw);
-				const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw);
+				const Vector3f attitude_des = Vector3f(roll_des, pitch_des, _manual_control_setpoint.yaw);
 
 				if (ramping_up) {
 					// Reset position setpoint to current xy-position at the hovering height
