@@ -324,7 +324,8 @@ def main():
     else:
         rospy.loginfo("Hover altitude reached!")
 
-    rospy.sleep(2.0)
+    # Hold level attitude (keep publishing so OFFBOARD stream never breaks)
+    settle(att_pub, 2.0)
 
     # ============ Attitude Tracking Tests ============
     rospy.loginfo("")
