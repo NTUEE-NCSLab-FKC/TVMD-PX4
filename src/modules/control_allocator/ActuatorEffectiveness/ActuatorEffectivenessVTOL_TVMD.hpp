@@ -66,10 +66,15 @@ public:
 	// static constexpr float Td0 =  0.0040;
 	// static constexpr float c_l = 10.2645f;
 	// static constexpr float c_d =  0.2132f;
-	static constexpr float c_l =  6.1250f;
-	static constexpr float c_d =  0.2132f;
-	static constexpr float Tf0 =  0.0000f;
-	static constexpr float Td0 =  0.0000f;
+	// Quadratic thrust model: T = CT * u^2
+	// Calibrated from motor test data (I2C_EC_MIN=1000, I2C_EC_MAX=1600):
+	//   u = (PWM - 1000) / 600, range [0, 1]
+	//   At u=1.0 (PWM=1600): T = 7.553 N (770 g)
+	//   CT fit at hover (PWM≈1400, u≈0.667, T≈3.19 N): CT ≈ 7.2 N
+	static constexpr float CT    =  7.2000f;  // quadratic thrust coefficient [N]
+	static constexpr float c_d   =  0.2132f;
+	static constexpr float Tf0   =  0.0000f;
+	static constexpr float Td0   =  0.0000f;
 
 	// region [Geometry Struct Definitions]
 	struct ModuleGeometry {
