@@ -158,6 +158,9 @@ private:
 		(ParamFloat<px4::params::PFA_GAIN_Y_D>) _param_pose_gain_d_y,
 		(ParamFloat<px4::params::PFA_GAIN_Z_D>) _param_pose_gain_d_z,
 
+		(ParamFloat<px4::params::PFA_DES_ROLL>)  _param_des_roll,   /**< desired roll  (deg) for attitude target */
+		(ParamFloat<px4::params::PFA_DES_PITCH>) _param_des_pitch,  /**< desired pitch (deg) for attitude target */
+
 		(ParamInt<px4::params::PFA_TKF_BYP>)    _param_takeoff_bypass,
 
 		(ParamFloat<px4::params::PFA_VEH_MASS>) _param_vehicle_mass,

@@ -362,7 +362,14 @@ void PFAPOSControl::Run()
 
 			// The flying state including the rampup phase
 			if (flying) {
-				const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw); // roll and pitch = 0, yaw from trajectory setpoint
+				// Desired attitude: roll and pitch from PFA_DES_ROLL / PFA_DES_PITCH parameters
+				// (settable at runtime via MAVLink PARAM_SET), yaw from trajectory setpoint.
+				// pfa_pos_control computes thrust independently using current attitude feedback;
+				// these parameters only change the attitude target forwarded to the attitude controller.
+				const Vector3f attitude_des = Vector3f(
+					math::radians(_param_des_roll.get()),
+					math::radians(_param_des_pitch.get()),
+					_trajectory_setpoint.yaw);
 				// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
 
 				if (ramping_up) {

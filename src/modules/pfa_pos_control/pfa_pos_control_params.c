@@ -109,6 +109,37 @@ PARAM_DEFINE_FLOAT(PFA_VEH_MASS, 1.400f);
 PARAM_DEFINE_FLOAT(PFA_MAX_THR, 24.00f);
 
 /**
+ * Desired roll angle for position control mode (degrees)
+ *
+ * Sets the desired body roll angle passed to pose_controller_6dof as
+ * euler_attitude_des(0).  Positive = right-wing down.
+ *
+ * @min -45.0
+ * @max  45.0
+ * @unit deg
+ * @group PFA Position Control
+ * @decimal 1
+ */
+PARAM_DEFINE_FLOAT(PFA_DES_ROLL, 0.0f);
+
+/**
+ * Desired pitch angle for position control mode (degrees)
+ *
+ * Sets the desired body pitch angle passed to pose_controller_6dof as
+ * euler_attitude_des(1).  Positive = nose up.
+ * The position controller still computes the thrust in NED using current
+ * attitude feedback; this parameter only changes the attitude target that
+ * is forwarded to the attitude controller.
+ *
+ * @min -45.0
+ * @max  45.0
+ * @unit deg
+ * @group PFA Position Control
+ * @decimal 1
+ */
+PARAM_DEFINE_FLOAT(PFA_DES_PITCH, 0.0f);
+
+/**
  * Bypassing takeoff process (takeoff immediately after arming)
  *
  * @group PFA Position Control
