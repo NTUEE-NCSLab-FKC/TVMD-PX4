@@ -366,10 +366,19 @@ void PFAPOSControl::Run()
 				// (settable at runtime via MAVLink PARAM_SET), yaw from trajectory setpoint.
 				// pfa_pos_control computes thrust independently using current attitude feedback;
 				// these parameters only change the attitude target forwarded to the attitude controller.
+				//
+				// Guard against NaN yaw: when SET_POSITION_TARGET_LOCAL_NED ignores yaw
+				// (type_mask bit 10 = 1), PX4 sets trajectory_setpoint.yaw = NaN.
+				// pfa_att_control uses _checkAllFinite() on the full euler vector, so a single
+				// NaN component zeroes out the entire attitude command including pitch.
+				const Eulerf euler_att_now(Quatf(_vehicle_attitude.q));
+				const float safe_yaw = PX4_ISFINITE(_trajectory_setpoint.yaw)
+					? _trajectory_setpoint.yaw
+					: euler_att_now(2);   // fall back to current yaw
 				const Vector3f attitude_des = Vector3f(
 					math::radians(_param_des_roll.get()),
 					math::radians(_param_des_pitch.get()),
-					_trajectory_setpoint.yaw);
+					safe_yaw);
 				// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
 
 				if (ramping_up) {
