@@ -310,7 +310,7 @@ while time.time() < end_t:
     set_position_target(0.0, 0.0, -TARGET_ALT_M)
     now = time.time()
     if now - last_print > 2.0:
-        _, pz, _, _, _, _ = (get_local_position() + (None,))[:6] if False else get_local_position()
+        px, py, pz, _, _, _ = get_local_position()
         _, pitch, _ = get_attitude()
         alt   = -pz if pz is not None else 0.0
         p_deg = math.degrees(pitch) if pitch is not None else 0.0
@@ -368,7 +368,6 @@ while current_pitch_cmd < TARGET_PITCH_DEG - 0.01:
     while time.time() < step_end:
         set_position_target(0.0, 0.0, -TARGET_ALT_M)
 
-        _, pz, _, _, _, _ = (None,) * 6 if False else get_local_position()[1:]  # avoid unpack issue
         px, py, pz, vx, vy, vz = get_local_position()
         _, pitch, _ = get_attitude()
 
