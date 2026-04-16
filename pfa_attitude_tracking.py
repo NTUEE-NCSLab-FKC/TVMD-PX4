@@ -96,7 +96,7 @@ def param_set(name: str, value: float, retries: int = 5) -> bool:
     return False
 
 
-def param_get(name: str) -> float | None:
+def param_get(name: str):
     """Read a parameter from the flight controller."""
     master.mav.param_request_read_send(
         master.target_system,
