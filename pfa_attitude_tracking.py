@@ -343,11 +343,18 @@ while time.time() < end_t:
 #  │  驅動機體達到 pitch = 45°                                 │
 #  └──────────────────────────────────────────────────────────┘
 # ─────────────────────────────────────────────────────────────
-PARAM_STEP_DEG  = 5.0           # 每次 PARAM_SET 的 pitch 步進量 (deg)
-PARAM_STEP_WAIT = PITCH_RAMP_TIME / (TARGET_PITCH_DEG / PARAM_STEP_DEG)
+PARAM_STEP_DEG  = 5.0           # 每次 PARAM_SET 的 pitch 步進量 (deg，恆正)
+# 用 abs() 確保正負 pitch 都能正確計算等待時間
+PARAM_STEP_WAIT = PITCH_RAMP_TIME / (abs(TARGET_PITCH_DEG) / PARAM_STEP_DEG)
 
+# 物理限制提示：_thrust_xy_max = 0.3，飽和條件 |hover_thrust * sin(pitch)| = 0.3
+# 飽和角 = arcsin(0.3 / (m*g/F_max)) = arcsin(0.3/0.572) ≈ ±31.6°
+# |pitch| < 31.6° → 完整追蹤；|pitch| > 31.6° → XY 板手飽和，位置可能漂移
+_sat_limit = math.degrees(math.asin(0.3 / ((1.4 * 9.81) / 24.0)))
 print(f"\n[Step 5] Pitch ramp: 0° → {TARGET_PITCH_DEG:.0f}° "
       f"(step={PARAM_STEP_DEG:.0f}°, interval={PARAM_STEP_WAIT:.1f} s/step)")
+print(f"  XY thrust saturation limit: ±{_sat_limit:.1f}°  "
+      f"({'OK' if abs(TARGET_PITCH_DEG) <= _sat_limit else 'WARNING: near/over saturation'})")
 print( "  → PARAM_SET PFA_DES_PITCH  so pfa_pos_control carries the attitude target")
 print( "  → position setpoint (z=-1 m) keeps pfa_pos_control computing thrust")
 
@@ -355,8 +362,14 @@ current_pitch_cmd = 0.0
 ramp_start = time.time()
 last_print = 0.0
 
-while current_pitch_cmd < TARGET_PITCH_DEG - 0.01:
-    next_pitch = min(current_pitch_cmd + PARAM_STEP_DEG, TARGET_PITCH_DEG)
+# 正負 pitch 均支援：step 方向跟隨 TARGET_PITCH_DEG 的符號，clamp 防止 overshoot
+while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
+    step       = math.copysign(PARAM_STEP_DEG, TARGET_PITCH_DEG - current_pitch_cmd)
+    next_pitch = current_pitch_cmd + step
+    # clamp：不超過目標
+    if (step > 0 and next_pitch > TARGET_PITCH_DEG) or \
+       (step < 0 and next_pitch < TARGET_PITCH_DEG):
+        next_pitch = TARGET_PITCH_DEG
 
     print(f"  PARAM_SET PFA_DES_PITCH = {next_pitch:.1f}° ... ", end='', flush=True)
     ok = param_set('PFA_DES_PITCH', next_pitch)
