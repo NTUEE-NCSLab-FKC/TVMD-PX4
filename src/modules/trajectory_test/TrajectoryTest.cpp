@@ -74,7 +74,7 @@ static TrajectoryBase *create_trajectory(const char *name)
 }
 
 TrajectoryTest::TrajectoryTest() :
-	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers)
+	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::hp_default)
 {
 }
 
@@ -93,7 +93,10 @@ bool TrajectoryTest::init()
 	_state = State::SEND_SETPOINTS;
 	_pre_offboard_count = 0;
 	_current_wp = 0;
+	_land_count = 0;
+	_run_count = 0;
 	_state_start = hrt_absolute_time();
+	_last_log_time = hrt_absolute_time();
 
 	ScheduleOnInterval(50_ms); // 20 Hz
 	PX4_INFO("Starting trajectory: %s (%d waypoints)", _trajectory->name(), _trajectory->num_waypoints());
@@ -158,10 +161,12 @@ void TrajectoryTest::Run()
 		return;
 	}
 
+	_run_count++;
+
 	const int num_wps = _trajectory->num_waypoints();
 
-	// Keep offboard alive by publishing control mode + setpoint
-	if (_state != State::DONE && _state != State::IDLE && _state != State::LAND) {
+	// Keep offboard alive — publish in ALL active states including LAND
+	if (_state != State::DONE && _state != State::IDLE) {
 		publish_offboard_control_mode();
 
 		int wp_idx = (_current_wp >= 0 && _current_wp < num_wps) ? _current_wp : 0;
@@ -174,6 +179,15 @@ void TrajectoryTest::Run()
 
 	vehicle_local_position_s local_pos{};
 	_vehicle_local_position_sub.copy(&local_pos);
+
+	// Periodic heartbeat log (every 5s) for hardware diagnostics
+	if (hrt_elapsed_time(&_last_log_time) > 5000000) {
+		_last_log_time = hrt_absolute_time();
+		PX4_INFO("[heartbeat] run=%d state=%d wp=%d/%d nav=%d arm=%d pos_valid=%d",
+			 _run_count, (int)_state, _current_wp, num_wps,
+			 vehicle_status.nav_state, vehicle_status.arming_state,
+			 (local_pos.xy_valid && local_pos.z_valid) ? 1 : 0);
+	}
 
 	switch (_state) {
 
@@ -298,9 +312,17 @@ void TrajectoryTest::Run()
 
 	case State::LAND:
 		// AUTO.LAND: main_mode=4(AUTO), sub_mode=6(LAND)
-		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1.0f, 4.0f, 6.0f);
-		PX4_INFO("Land command sent.");
-		_state = State::DONE;
+		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_NAV_LAND);
+		_land_count++;
+
+		if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LAND
+		    || _land_count > LAND_REPEAT_COUNT) {
+			PX4_INFO("Land %s after %d attempts.",
+				 (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LAND)
+				 ? "confirmed" : "timeout", _land_count);
+			_state = State::DONE;
+		}
+
 		break;
 
 	case State::DONE:

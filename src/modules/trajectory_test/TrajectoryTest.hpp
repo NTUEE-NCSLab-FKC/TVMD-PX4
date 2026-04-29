@@ -68,6 +68,8 @@ public:
 	TrajectoryTest();
 	~TrajectoryTest() override;
 
+	static constexpr int LAND_REPEAT_COUNT = 40; // send LAND cmd for 2s at 20Hz
+
 	static int task_spawn(int argc, char *argv[]);
 	static int custom_command(int argc, char *argv[]);
 	static int print_usage(const char *reason = nullptr);
@@ -105,8 +107,11 @@ private:
 
 	int _current_wp{0};
 	int _pre_offboard_count{0};
+	int _land_count{0};
+	int _run_count{0};
 	hrt_abstime _hold_start{0};
 	hrt_abstime _state_start{0};
+	hrt_abstime _last_log_time{0};
 
 	static constexpr int PRE_OFFBOARD_SETPOINTS = 100; // 5s at 20Hz
 
