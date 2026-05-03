@@ -20,11 +20,11 @@ ekf2 start &
 # actuator_transporter_i2c start
 
 # Start hardware-specific drivers only when NOT in simulation
- if ! param compare -s SIM_GZ_EN 1
- then
-     i2c_out start
-     actuator_transporter_i2c start
- fi
+if [ -z "$PX4_SIM_MODEL" ] && ! param compare -s SIM_GZ_EN 1
+then
+    i2c_out start
+    actuator_transporter_i2c start
+fi
 
 
 #
