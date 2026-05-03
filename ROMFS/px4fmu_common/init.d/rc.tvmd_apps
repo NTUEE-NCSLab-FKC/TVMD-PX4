@@ -19,8 +19,8 @@ ekf2 start &
 # i2c_out start
 # actuator_transporter_i2c start
 
-# Start hardware-specific drivers only when NOT in simulation
-if [ -z "$PX4_SIM_MODEL" ] && ! param compare -s SIM_GZ_EN 1
+# Start I2C actuator drivers only on hardware AND when I2C output is enabled
+if [ -z "$PX4_SIM_MODEL" ] && ! param compare -s SIM_GZ_EN 1 && param compare -s I2C_OUT_EN 1
 then
     i2c_out start
     actuator_transporter_i2c start
