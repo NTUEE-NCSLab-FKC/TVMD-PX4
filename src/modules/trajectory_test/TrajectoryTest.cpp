@@ -93,9 +93,9 @@ bool TrajectoryTest::init()
 	_state = State::SEND_SETPOINTS;
 	_pre_offboard_count = 0;
 	_current_wp = 0;
-	_land_count = 0;
 	_run_count = 0;
 	_state_start = hrt_absolute_time();
+	_last_cmd_time = 0;
 	_last_log_time = hrt_absolute_time();
 
 	ScheduleOnInterval(50_ms); // 20 Hz
@@ -201,17 +201,23 @@ void TrajectoryTest::Run()
 			PX4_INFO("Pre-offboard done (%d setpoints). Switching to OFFBOARD...", _pre_offboard_count);
 			_state = State::OFFBOARD;
 			_state_start = hrt_absolute_time();
+			_last_cmd_time = 0;
 		}
 
 		break;
 
 	case State::OFFBOARD:
-		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1.0f, 6.0f); // 6=OFFBOARD
+		if (hrt_elapsed_time(&_last_cmd_time) > 2_s) {
+			send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1.0f, 6.0f);
+			_last_cmd_time = hrt_absolute_time();
+			PX4_INFO("OFFBOARD mode command sent");
+		}
 
 		if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_OFFBOARD) {
 			PX4_INFO("OFFBOARD confirmed. Arming...");
 			_state = State::ARM;
 			_state_start = hrt_absolute_time();
+			_last_cmd_time = 0;
 
 		} else if (hrt_elapsed_time(&_state_start) > 10_s) {
 			PX4_ERR("OFFBOARD timeout. Aborting.");
@@ -221,7 +227,11 @@ void TrajectoryTest::Run()
 		break;
 
 	case State::ARM:
-		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0f, 21196.0f);
+		if (hrt_elapsed_time(&_last_cmd_time) > 2_s) {
+			send_vehicle_command(vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0f, 21196.0f);
+			_last_cmd_time = hrt_absolute_time();
+			PX4_INFO("ARM command sent");
+		}
 
 		if (vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
 			PX4_INFO("Armed! Taking off...");
@@ -253,6 +263,8 @@ void TrajectoryTest::Run()
 			} else if (hrt_elapsed_time(&_state_start) > 30_s) {
 				PX4_ERR("Takeoff timeout. Landing.");
 				_state = State::LAND;
+				_state_start = hrt_absolute_time();
+				_last_cmd_time = 0;
 			}
 		}
 
@@ -295,6 +307,8 @@ void TrajectoryTest::Run()
 			if (_current_wp >= num_wps) {
 				PX4_INFO("%s trajectory complete! Landing...", _trajectory->name());
 				_state = State::LAND;
+				_state_start = hrt_absolute_time();
+				_last_cmd_time = 0;
 
 			} else {
 				Waypoint next = _trajectory->waypoint(_current_wp);
@@ -311,15 +325,18 @@ void TrajectoryTest::Run()
 	}
 
 	case State::LAND:
-		// AUTO.LAND: main_mode=4(AUTO), sub_mode=6(LAND)
-		send_vehicle_command(vehicle_command_s::VEHICLE_CMD_NAV_LAND);
-		_land_count++;
+		if (hrt_elapsed_time(&_last_cmd_time) > 2_s) {
+			send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1.0f, 4.0f, 6.0f);
+			_last_cmd_time = hrt_absolute_time();
+			PX4_INFO("AUTO.LAND mode command sent");
+		}
 
-		if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LAND
-		    || _land_count > LAND_REPEAT_COUNT) {
-			PX4_INFO("Land %s after %d attempts.",
-				 (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LAND)
-				 ? "confirmed" : "timeout", _land_count);
+		if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LAND) {
+			PX4_INFO("Landing confirmed.");
+			_state = State::DONE;
+
+		} else if (hrt_elapsed_time(&_state_start) > 30_s) {
+			PX4_INFO("Land timeout. Stopping.");
 			_state = State::DONE;
 		}
 
