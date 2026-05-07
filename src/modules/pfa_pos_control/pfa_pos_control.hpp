@@ -148,6 +148,9 @@ private:
 	manual_control_setpoint_s _manual_control_setpoint{};
 	vehicle_control_mode_s _vcontrol_mode{};
 
+	float _manual_desired_yaw{0.0f};
+	bool  _manual_yaw_initialized{false};
+
 	perf_counter_t	_loop_perf;
 
 	DEFINE_PARAMETERS(

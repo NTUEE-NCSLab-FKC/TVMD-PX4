@@ -329,56 +329,67 @@ void PFAPOSControl::Run()
 			// Extract current yaw from quaternion
 			const Quatf q_att(_vehicle_attitude.q);
 			const Eulerf euler_att(q_att);
-			const float current_yaw = euler_att(2);  // yaw is the third element
+			const float current_yaw = euler_att(2);
 
-			// Integrate yaw rate to get desired yaw
-			const float desired_yaw = current_yaw + yaw_rate * dt;
-			const Vector3f attitude_des = Vector3f(0.0f, 0.0f, desired_yaw);
+			// Initialize desired yaw to current yaw on first entry to manual mode
+			if (!_manual_yaw_initialized) {
+				_manual_desired_yaw = current_yaw;
+				_manual_yaw_initialized = true;
+			}
+
+			// Accumulate yaw rate from stick (persistent across iterations)
+			_manual_desired_yaw += yaw_rate * dt;
+
+			const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _manual_desired_yaw);
 
 			pose_controller_6dof(
 				traj_des, attitude_des, _vehicle_attitude, vlocal_pos);
 			// }
-		} else if ((_vcontrol_mode.flag_multicopter_position_control_enabled
-				|| _vcontrol_mode.flag_control_offboard_enabled)
-			&& (_trajectory_setpoint.timestamp >= _time_position_control_enabled)) {
-			// position mode / altitude mode
-
-			_vehicle_constraints_sub.update(&_vehicle_constraints);
-
-			// TODO: the land process is not handled yet
-			// Update takeoff state machine
-			_takeoff.updateTakeoffState(
-				_vcontrol_mode.flag_armed, false,
-				((_param_takeoff_bypass.get() > 0) ? true : _vehicle_constraints.want_takeoff),
-				_thrust_max, false, vlocal_pos.timestamp_sample);
-
-			// Return the maximum thrust according to the takeoff state machine
-			_thrust_up_max = _takeoff.updateRamp(dt, _thrust_max);
-			// const float speed_down = PX4_ISFINITE(_vehicle_constraints.speed_down) ? _vehicle_constraints.speed_down :
-
-			const bool flying     = (_takeoff.getTakeoffState() >= TakeoffState::rampup);
-			const bool ramping_up = (_takeoff.getTakeoffState() == TakeoffState::rampup);
-			// const bool flying_but_ground_contact = (flying && _vehicle_land_detected.ground_contact);
-
-			// The flying state including the rampup phase
-			if (flying) {
-				const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw); // roll and pitch = 0, yaw from trajectory setpoint
-				// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
-
-				if (ramping_up) {
-					// Reset position setpoint to current xy-position at the hovering height
-					stabilization_controller_6dof(
-						_trajectory_setpoint, attitude_des, _vehicle_attitude, vlocal_pos);
-				} else {
-					pose_controller_6dof(
-						_trajectory_setpoint, attitude_des, _vehicle_attitude, vlocal_pos);
-				}
-			}
 		} else {
-			// An update is necessary here because otherwise the takeoff state
-			// doesn't get skipped with non-altitude-controlled modes
-			_takeoff.updateTakeoffState(_vcontrol_mode.flag_armed, false, false,
-				_thrust_max, true, vlocal_pos.timestamp_sample);
+			_manual_yaw_initialized = false;
+
+			if ((_vcontrol_mode.flag_multicopter_position_control_enabled
+					|| _vcontrol_mode.flag_control_offboard_enabled)
+				&& (_trajectory_setpoint.timestamp >= _time_position_control_enabled)) {
+				// position mode / altitude mode
+
+				_vehicle_constraints_sub.update(&_vehicle_constraints);
+
+				// TODO: the land process is not handled yet
+				// Update takeoff state machine
+				_takeoff.updateTakeoffState(
+					_vcontrol_mode.flag_armed, false,
+					((_param_takeoff_bypass.get() > 0) ? true : _vehicle_constraints.want_takeoff),
+					_thrust_max, false, vlocal_pos.timestamp_sample);
+
+				// Return the maximum thrust according to the takeoff state machine
+				_thrust_up_max = _takeoff.updateRamp(dt, _thrust_max);
+				// const float speed_down = PX4_ISFINITE(_vehicle_constraints.speed_down) ? _vehicle_constraints.speed_down :
+
+				const bool flying     = (_takeoff.getTakeoffState() >= TakeoffState::rampup);
+				const bool ramping_up = (_takeoff.getTakeoffState() == TakeoffState::rampup);
+				// const bool flying_but_ground_contact = (flying && _vehicle_land_detected.ground_contact);
+
+				// The flying state including the rampup phase
+				if (flying) {
+					const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw); // roll and pitch = 0, yaw from trajectory setpoint
+					// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
+
+					if (ramping_up) {
+						// Reset position setpoint to current xy-position at the hovering height
+						stabilization_controller_6dof(
+							_trajectory_setpoint, attitude_des, _vehicle_attitude, vlocal_pos);
+					} else {
+						pose_controller_6dof(
+							_trajectory_setpoint, attitude_des, _vehicle_attitude, vlocal_pos);
+					}
+				}
+			} else {
+				// An update is necessary here because otherwise the takeoff state
+				// doesn't get skipped with non-altitude-controlled modes
+				_takeoff.updateTakeoffState(_vcontrol_mode.flag_armed, false, false,
+					_thrust_max, true, vlocal_pos.timestamp_sample);
+			}
 		}
 	}
 
