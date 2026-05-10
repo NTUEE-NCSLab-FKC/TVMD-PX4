@@ -372,12 +372,15 @@ void PFAPOSControl::Run()
 
 				// The flying state including the rampup phase
 				if (flying) {
-					// Yaw: integrate yawspeed (same logic as manual mode)
-					if (!_position_yaw_initialized) {
+					// Yaw control: two cases
+					// 1. MAVROS offboard (finite yaw): track commanded yaw directly each cycle
+					// 2. RC position mode (yaw=NaN): initialize once, then integrate yawspeed from stick
+					if (PX4_ISFINITE(_trajectory_setpoint.yaw)) {
+						_position_desired_yaw = _trajectory_setpoint.yaw;
+						_position_yaw_initialized = true;
+					} else if (!_position_yaw_initialized) {
 						const Eulerf euler_att_pos(Quatf(_vehicle_attitude.q));
-						_position_desired_yaw = PX4_ISFINITE(_trajectory_setpoint.yaw)
-							? _trajectory_setpoint.yaw
-							: euler_att_pos(2);
+						_position_desired_yaw = euler_att_pos(2);
 						_position_yaw_initialized = true;
 					}
 					if (PX4_ISFINITE(_trajectory_setpoint.yawspeed)) {
