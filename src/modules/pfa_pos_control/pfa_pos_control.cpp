@@ -386,7 +386,10 @@ void PFAPOSControl::Run()
 					if (PX4_ISFINITE(_trajectory_setpoint.yawspeed)) {
 						_position_desired_yaw += _trajectory_setpoint.yawspeed * dt;
 					}
-					const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _position_desired_yaw);
+					const Vector3f attitude_des = Vector3f(
+						math::radians(_param_des_roll.get()),
+						math::radians(_param_des_pitch.get()),
+						_position_desired_yaw);
 
 					// Velocity feedforward for XY movement
 					const float pos_vel_gain = 2.0f;

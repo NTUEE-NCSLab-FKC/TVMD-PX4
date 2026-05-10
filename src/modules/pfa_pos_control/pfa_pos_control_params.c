@@ -114,3 +114,21 @@ PARAM_DEFINE_FLOAT(PFA_MAX_THR, 24.00f);
  * @group PFA Position Control
  */
 PARAM_DEFINE_INT32(PFA_TKF_BYP, 1);
+
+/**
+ * Desired roll angle in degrees (position/offboard mode)
+ *
+ * @group PFA Position Control
+ * @unit deg
+ * @decimal 1
+ */
+PARAM_DEFINE_FLOAT(PFA_DES_ROLL,  0.0f);
+
+/**
+ * Desired pitch angle in degrees (position/offboard mode)
+ *
+ * @group PFA Position Control
+ * @unit deg
+ * @decimal 1
+ */
+PARAM_DEFINE_FLOAT(PFA_DES_PITCH, 0.0f);
