@@ -372,21 +372,44 @@ void PFAPOSControl::Run()
 
 				// The flying state including the rampup phase
 				if (flying) {
-					const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw); // roll and pitch = 0, yaw from trajectory setpoint
-					// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
+					// Yaw: integrate yawspeed (same logic as manual mode)
+					if (!_position_yaw_initialized) {
+						const Eulerf euler_att_pos(Quatf(_vehicle_attitude.q));
+						_position_desired_yaw = PX4_ISFINITE(_trajectory_setpoint.yaw)
+							? _trajectory_setpoint.yaw
+							: euler_att_pos(2);
+						_position_yaw_initialized = true;
+					}
+					if (PX4_ISFINITE(_trajectory_setpoint.yawspeed)) {
+						_position_desired_yaw += _trajectory_setpoint.yawspeed * dt;
+					}
+					const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _position_desired_yaw);
+
+					// Velocity feedforward for XY movement
+					const float pos_vel_gain = 2.0f;
+					trajectory_setpoint_s traj_with_feedforward = _trajectory_setpoint;
+					if (PX4_ISFINITE(_trajectory_setpoint.velocity[0]) &&
+						PX4_ISFINITE(_trajectory_setpoint.velocity[1])) {
+						traj_with_feedforward.acceleration[0] =
+							(_trajectory_setpoint.velocity[0] - vlocal_pos.vx) * pos_vel_gain;
+						traj_with_feedforward.acceleration[1] =
+							(_trajectory_setpoint.velocity[1] - vlocal_pos.vy) * pos_vel_gain;
+					}
 
 					if (ramping_up) {
-						// Reset position setpoint to current xy-position at the hovering height
 						stabilization_controller_6dof(
-							_trajectory_setpoint, attitude_des, _vehicle_attitude, vlocal_pos);
+							traj_with_feedforward, attitude_des, _vehicle_attitude, vlocal_pos);
 					} else {
 						pose_controller_6dof(
-							_trajectory_setpoint, attitude_des, _vehicle_attitude, vlocal_pos);
+							traj_with_feedforward, attitude_des, _vehicle_attitude, vlocal_pos);
 					}
+				} else {
+					_position_yaw_initialized = false;
 				}
 			} else {
 				// An update is necessary here because otherwise the takeoff state
 				// doesn't get skipped with non-altitude-controlled modes
+				_position_yaw_initialized = false;
 				_takeoff.updateTakeoffState(_vcontrol_mode.flag_armed, false, false,
 					_thrust_max, true, vlocal_pos.timestamp_sample);
 			}

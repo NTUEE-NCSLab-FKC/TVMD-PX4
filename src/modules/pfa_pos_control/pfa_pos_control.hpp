@@ -151,6 +151,9 @@ private:
 	float _manual_desired_yaw{0.0f};
 	bool  _manual_yaw_initialized{false};
 
+	float _position_desired_yaw{0.0f};
+	bool  _position_yaw_initialized{false};
+
 	perf_counter_t	_loop_perf;
 
 	DEFINE_PARAMETERS(
