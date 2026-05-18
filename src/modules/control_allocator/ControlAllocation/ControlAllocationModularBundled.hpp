@@ -68,8 +68,8 @@ public:
 	static constexpr float sigma_eta[2] {M_PI_F / 4.0f, M_PI_F / 4.0f}; 	// 45 degree for both axes
 	static constexpr float r_sigma_eta[2] {M_PI_F / 10.0f, M_PI_F / 10.0f};
 	// static constexpr float f_max {9.818f * 1.25f};	// maximum thrust of a single agent
-	static constexpr float f_max {7.553f};	// maximum thrust of a single agent [N] (770g at PWM=1600)
-	static constexpr float f_min {0.5f};			// minimum thrust of a single agent
+	static constexpr float f_max {9.015f};	// maximum thrust of a single agent [N] (c_l*1 + Tf0 = 7.845+1.17, PWM=2000)
+	static constexpr float f_min {1.170f};	// minimum thrust of a single agent [N] (Tf0 at PWM=1000)
 
 	// Coordinate transformation
 	const float team_t_max {15.0f};					// maximum torque of the team

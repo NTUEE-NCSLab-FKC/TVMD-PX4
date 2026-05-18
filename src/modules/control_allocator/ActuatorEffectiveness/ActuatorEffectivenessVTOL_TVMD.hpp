@@ -61,19 +61,15 @@ class ActuatorEffectivenessVTOL_TVMD : public ModuleParams, public ActuatorEffec
 public:
 	static constexpr int NUM_AGENTS_MAX = 4;
 
-	// TODO: The bias terms are needed to be determined
-	// static constexpr float Tf0 = -2.9717;
-	// static constexpr float Td0 =  0.0040;
-	// static constexpr float c_l = 10.2645f;
-	// static constexpr float c_d =  0.2132f;
-	// Quadratic thrust model: T = CT * u^2
-	// Calibrated from motor test data (I2C_EC_MIN=1000, I2C_EC_MAX=1600):
-	//   u = (PWM - 1000) / 600, range [0, 1]
-	//   At u=1.0 (PWM=1600): T = 7.553 N (770 g)
-	//   CT fit at hover (PWM≈1400, u≈0.667, T≈3.19 N): CT ≈ 7.2 N
-	static constexpr float CT    =  7.2000f;  // quadratic thrust coefficient [N]
+	// Linear thrust model: T = c_l * u + Tf0
+	// Calibrated from motor test data (I2C_EC_MIN=1000, I2C_EC_MAX=2000):
+	//   u = (PWM - 1000) / 1000, range [0, 1]
+	//   At u=0 (PWM=1000): T = 1.17 N (minimum thrust)
+	//   At u=1 (PWM=2000): T = 9.015 N (maximum thrust)
+	//   Hover (1.304 kg, 4 modules): T_hover = 3.197 N, u_hover = 0.258, PWM ≈ 1258 µs
+	static constexpr float c_l   =  7.8450f;  // linear thrust coefficient [N/unit]
 	static constexpr float c_d   =  0.2132f;
-	static constexpr float Tf0   =  0.0000f;
+	static constexpr float Tf0   =  1.1700f;  // thrust at zero throttle [N]
 	static constexpr float Td0   =  0.0000f;
 
 	// region [Geometry Struct Definitions]

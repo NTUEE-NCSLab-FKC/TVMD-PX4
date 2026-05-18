@@ -332,16 +332,16 @@ void ActuatorEffectivenessVTOL_TVMD::updateSetpoint(const matrix::Vector<float, 
 }
 
 // Single propeller inverse mapping: thrust -> throttle
-// Quadratic model: T = CT * u^2  =>  u = sqrt(T / CT)
+// Linear model: T = c_l * u + Tf0  =>  u = (T - Tf0) / c_l
 void ActuatorEffectivenessVTOL_TVMD::tf_inverse_mapping(const uint8_t module_id, const float tftd, float &u_prop) const {
 	const float thrust = tftd - Tf0;
-	u_prop = (thrust > 0.0f) ? sqrtf(thrust / CT) : 0.0f;
+	u_prop = (thrust > 0.0f) ? (thrust / c_l) : 0.0f;
 }
 
 // Single propeller forward mapping: throttle -> thrust
-// Quadratic model: T = CT * u^2
+// Linear model: T = c_l * u + Tf0
 void ActuatorEffectivenessVTOL_TVMD::tf_mapping(const uint8_t module_id, float &tftd, const float u_prop) const {
-	tftd = CT * u_prop * u_prop + Tf0;
+	tftd = c_l * u_prop + Tf0;
 }
 
 
