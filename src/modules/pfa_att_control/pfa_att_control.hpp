@@ -135,12 +135,18 @@ private:
 	perf_counter_t	_loop_perf;
 
 	DEFINE_PARAMETERS(
-		(ParamFloat<px4::params::PFA_ROLL_P>) _param_roll_p,
-		(ParamFloat<px4::params::PFA_ROLL_D>) _param_roll_d,
-		(ParamFloat<px4::params::PFA_PITCH_P>) _param_pitch_p,
-		(ParamFloat<px4::params::PFA_PITCH_D>) _param_pitch_d,
-		(ParamFloat<px4::params::PFA_YAW_P>) _param_yaw_p,
-		(ParamFloat<px4::params::PFA_YAW_D>) _param_yaw_d,
+		(ParamFloat<px4::params::PFA_ROLL_P>)    _param_roll_p,
+		(ParamFloat<px4::params::PFA_ROLL_I>)    _param_roll_i,
+		(ParamFloat<px4::params::PFA_ROLL_ILIM>) _param_roll_i_lim,
+		(ParamFloat<px4::params::PFA_ROLL_D>)    _param_roll_d,
+		(ParamFloat<px4::params::PFA_PITCH_P>)    _param_pitch_p,
+		(ParamFloat<px4::params::PFA_PITCH_I>)    _param_pitch_i,
+		(ParamFloat<px4::params::PFA_PITCH_ILIM>) _param_pitch_i_lim,
+		(ParamFloat<px4::params::PFA_PITCH_D>)    _param_pitch_d,
+		(ParamFloat<px4::params::PFA_YAW_P>)    _param_yaw_p,
+		(ParamFloat<px4::params::PFA_YAW_I>)    _param_yaw_i,
+		(ParamFloat<px4::params::PFA_YAW_ILIM>) _param_yaw_i_lim,
+		(ParamFloat<px4::params::PFA_YAW_D>)    _param_yaw_d,
 		(ParamFloat<px4::params::PFA_MAX_TOR>) _param_vehicle_max_torque,
 		(ParamInt<px4::params::PFA_EN_ATT_PLAN>) _param_enable_attitude_planner,
 
@@ -188,4 +194,8 @@ private:
 
 	Matrix3f _team_inertia{};
 	void calc_team_inertia(Matrix3f &output);
+
+	Vector3f _e_R_integral{};
+	hrt_abstime _last_att_control_time{0};
+	bool _att_control_was_active{false};
 };

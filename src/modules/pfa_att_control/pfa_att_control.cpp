@@ -232,9 +232,17 @@ void PFAAttitudeControl::control_attitude_geo(const vehicle_attitude_s &attitude
 		omega_d = omega_ref;
 	}
 
+	// Compute dt and update timestamp
+	const float dt = (_last_att_control_time > 0)
+		? math::constrain((float)(attitude.timestamp - _last_att_control_time) * 1e-6f, 0.0002f, 0.1f)
+		: 0.004f;
+	_last_att_control_time = attitude.timestamp;
+
 	// Retrieve gains
-	const Vector3f Kr = Vector3f(_param_roll_p.get(), _param_pitch_p.get(), _param_yaw_p.get());
-	const Vector3f Kw = Vector3f(_param_roll_d.get(), _param_pitch_d.get(), _param_yaw_d.get());
+	const Vector3f Kr   = Vector3f(_param_roll_p.get(),     _param_pitch_p.get(),     _param_yaw_p.get());
+	const Vector3f Ki   = Vector3f(_param_roll_i.get(),     _param_pitch_i.get(),     _param_yaw_i.get());
+	const Vector3f Kilim= Vector3f(_param_roll_i_lim.get(), _param_pitch_i_lim.get(), _param_yaw_i_lim.get());
+	const Vector3f Kw   = Vector3f(_param_roll_d.get(),     _param_pitch_d.get(),     _param_yaw_d.get());
 
 
 	// Compute attitude error
@@ -243,11 +251,15 @@ void PFAAttitudeControl::control_attitude_geo(const vehicle_attitude_s &attitude
 	const Vector3f e_R_vec = e_R.vee();
 	const Vector3f err_omega = omega - omega_d;
 
+	// Update integral with per-axis anti-windup clamping
+	_e_R_integral += e_R_vec * dt;
+	for (int i = 0; i < 3; i++) {
+		_e_R_integral(i) = math::constrain(_e_R_integral(i), -Kilim(i), Kilim(i));
+	}
 
 	// Compute torque control
 	// max torque should be set to the same value as the one in control allocation
-	// TODO: add inertia matrix
-	const Vector3f torques = - _team_inertia * (Kr.emult(e_R_vec) + Kw.emult(err_omega)) / _param_vehicle_max_torque.get();
+	const Vector3f torques = - _team_inertia * (Kr.emult(e_R_vec) + Ki.emult(_e_R_integral) + Kw.emult(err_omega)) / _param_vehicle_max_torque.get();
 
 	const Vector3f torque_offset = Vector3f(0.0f, 0.0f, 0.0f);
 
@@ -317,7 +329,16 @@ void PFAAttitudeControl::Run()
 			_vehicle_rates_setpoint_sub.update(&_rates_setpoint);
 			_trajectory_setpoint_sub.update(&_trajectory_setpoint);
 
+			if (!_att_control_was_active) {
+				_e_R_integral.setZero();
+				_last_att_control_time = 0;
+				_att_control_was_active = true;
+			}
+
 			control_attitude_geo(attitude, _attitude_setpoint, angular_velocity, _rates_setpoint);
+
+		} else {
+			_att_control_was_active = false;
 		}
 	}
 

@@ -57,6 +57,22 @@
 PARAM_DEFINE_FLOAT(PFA_ROLL_P, 5.0f);
 
 /**
+ * Roll integral gain
+ *
+ * @group UUV Attitude Control
+ * @decimal 3
+ */
+PARAM_DEFINE_FLOAT(PFA_ROLL_I, 0.0f);
+
+/**
+ * Roll integral limit
+ *
+ * @group UUV Attitude Control
+ * @decimal 2
+ */
+PARAM_DEFINE_FLOAT(PFA_ROLL_ILIM, 0.3f);
+
+/**
  * Roll differential gain
  *
  * @group UUV Attitude Control
@@ -75,6 +91,22 @@ PARAM_DEFINE_FLOAT(PFA_ROLL_D, 7.0f);
 PARAM_DEFINE_FLOAT(PFA_PITCH_P, 5.0f);
 
 /**
+ * Pitch integral gain
+ *
+ * @group UUV Attitude Control
+ * @decimal 3
+ */
+PARAM_DEFINE_FLOAT(PFA_PITCH_I, 0.0f);
+
+/**
+ * Pitch integral limit
+ *
+ * @group UUV Attitude Control
+ * @decimal 2
+ */
+PARAM_DEFINE_FLOAT(PFA_PITCH_ILIM, 0.3f);
+
+/**
  * Pitch differential gain
  *
  * @group UUV Attitude Control
@@ -85,12 +117,28 @@ PARAM_DEFINE_FLOAT(PFA_PITCH_D, 7.0f);
 
 // Yaw gains
 /**
- * Yawh proportional gain
+ * Yaw proportional gain
  *
  * @group UUV Attitude Control
  * @decimal 2
  */
 PARAM_DEFINE_FLOAT(PFA_YAW_P, 1.0f);
+
+/**
+ * Yaw integral gain
+ *
+ * @group UUV Attitude Control
+ * @decimal 3
+ */
+PARAM_DEFINE_FLOAT(PFA_YAW_I, 0.0f);
+
+/**
+ * Yaw integral limit
+ *
+ * @group UUV Attitude Control
+ * @decimal 2
+ */
+PARAM_DEFINE_FLOAT(PFA_YAW_ILIM, 0.3f);
 
 /**
  * Yaw differential gain
