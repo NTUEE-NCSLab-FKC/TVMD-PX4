@@ -4,6 +4,70 @@
 
 ---
 
+## 座標系定義
+
+PX4 使用兩種主要座標系，TVMD 控制器內部另有 NWU：
+
+```
+NED（地球固定）           FRD（機體，PX4 標準）    NWU（機體，TVMD 內部）
+  N = +x（北）              F = +x（前）              F = +x（前）
+  E = +y（東）              R = +y（右）              L = +y（左，Y 反向）
+  D = +z（向下）            D = +z（向下）            U = +z（向上，Z 反向）
+```
+
+**座標系轉換（機體座標內）：** `NWU = (FRD_x, −FRD_y, −FRD_z)`
+
+### 座標系速查表
+
+```
+Topic                               主要量               座標系
+──────────────────────────────────────────────────────────────────
+vehicle_attitude.q                  姿態四元數            FRD → NED
+vehicle_angular_velocity.xyz        角速度                FRD 機體（rad/s）
+vehicle_acceleration.xyz            加速度（含重力）       FRD 機體（m/s²）
+sensor_combined.gyro_rad            陀螺儀               FRD 機體（rad/s）
+sensor_combined.accelerometer_m_s2 加速度計              FRD 機體（m/s²）
+vehicle_magnetometer.magnetometer_ga磁場                  FRD 機體（Gauss）
+vehicle_imu.delta_angle             角度增量              FRD 機體（rad）
+vehicle_imu.delta_velocity          速度增量              FRD 機體（m/s）
+──────────────────────────────────────────────────────────────────
+vehicle_local_position.x/y/z        位置                  NED（m，z向下為正）
+vehicle_local_position.vx/vy/vz     速度                  NED（m/s）
+vehicle_local_position.ax/ay/az     加速度                NED（m/s²）
+vehicle_local_position.heading      偏航角                NED（rad，從北順時針）
+vehicle_global_position             緯度/經度/高度         WGS84
+trajectory_setpoint.position[3]     位置設定點            NED（m）
+trajectory_setpoint.yaw             偏航設定點            NED（rad）
+wind.windspeed_north/east           風速                  NED 水平分量（m/s）
+──────────────────────────────────────────────────────────────────
+vehicle_attitude_setpoint.q_d       期望姿態四元數         FRD → NED
+vehicle_attitude_setpoint.thrust_body 推力指令            FRD 機體（[2]<0=向上）
+vehicle_rates_setpoint.roll/pitch/yaw 角速率設定點 ①     FRD 機體（rad/s）
+vehicle_thrust_setpoint.xyz         推力設定點            FRD 機體（正規化）
+vehicle_torque_setpoint.xyz         力矩設定點            FRD 機體（正規化）
+──────────────────────────────────────────────────────────────────
+[TVMD 特有]
+control_allocation_meta_data.control_sp[6]  控制設定點    FRD 正規化
+  索引：[0]=Roll力矩 [1]=Pitch力矩 [2]=Yaw力矩
+        [3]=Fx     [4]=Fy     [5]=Fz（向下為正）
+control_allocation_meta_data.f_x/y/z[16]   各模組力      模組局部 NWU（N，z向上）
+attitude_planner_meta_data.q_d              期望姿態      FRD → NED
+attitude_planner_meta_data.sat_thrust_body  飽和推力 ②   NWU 機體（z向上）
+attitude_planner_meta_data.coplan_vector    旋轉軸        NWU 機體
+──────────────────────────────────────────────────────────────────
+```
+
+> ① `vehicle_rates_setpoint` 的 .msg 原始行內註解寫「body angular rates in NED frame」，
+>    為**誤導性描述**：roll/pitch/yaw 是 FRD 機體軸角速率，與地球座標系無關。
+>
+> ② `attitude_planner_meta_data.sat_thrust_body` 的 .msg 原始標注為「body NED frame」，
+>    但程式碼（`pfa_att_control.cpp:217`）在 NWU 空間計算後直接寫入，**實際為 NWU 座標系**。
+>    若需轉換至 FRD：`FRD = (sat[0], −sat[1], −sat[2])`。
+
+---
+
+---
+
 ## 日誌錄製 Profile
 
 | Profile 名稱 | 說明 |
