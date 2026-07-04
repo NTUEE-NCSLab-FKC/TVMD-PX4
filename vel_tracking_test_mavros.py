@@ -5,24 +5,24 @@ Forward Velocity Tracking Test (MAVROS / ROS 1)
 起飛懸停後向前飛行，即時顯示期望速度 vs 實際速度，
 用於驗證 pfa_pos_control 速度追蹤表現。
 
-■ pfa_pos_control 速度硬碼上限：1.0 m/s（不可透過參數調整）
-  超過 1.0 m/s 的命令會被截斷，腳本會自動警告並 clamp。
+■ 使用者設置（修改下方 Configuration 區塊）
+  DESIRED_VEL_MPS : 目標前進速度 (m/s)
+  FLY_DURATION_S  : 前進飛行時間 (s)
+  TARGET_ALT_M    : 飛行高度 (m)
 
-■ 使用方式
-  python3 vel_tracking_test_mavros.py                       # 預設 0.5 m/s, 10 s
-  python3 vel_tracking_test_mavros.py --vel 0.8 --dur 15
-  python3 vel_tracking_test_mavros.py --vel 1.0 --dur 20 --alt 1.2
+■ 速度上限
+  PFA_VEL_LIMIT 來自 pfa_pos_control 韌體原始碼：
+    src/modules/pfa_pos_control/pfa_pos_control.hpp  line 116
+      float _speed_xy_max{1.0f};
+  此值在 constrain() 前截斷所有水平速度命令，無法透過 MAVLink 參數調整。
 
-■ 參數
-  --vel  目標前進速度 m/s（預設 0.5，pfa_pos_control 上限 1.0）
-  --dur  前進飛行時間 s（預設 10）
-  --alt  飛行高度 m（預設 1.0）
+執行方式：
+  python3 vel_tracking_test_mavros.py
 """
 
 import sys
 import math
 import threading
-import argparse
 import rospy
 from tf.transformations import euler_from_quaternion
 
@@ -36,21 +36,17 @@ from mavros_msgs.srv import (
 )
 
 # ─────────────────────────────────────────────────────────────
-# CLI 參數（使用者設置）
+# Configuration ← 使用者修改這裡
 # ─────────────────────────────────────────────────────────────
-_parser = argparse.ArgumentParser(description='Forward velocity tracking test')
-_parser.add_argument('--vel', type=float, default=0.5,
-                     metavar='V', help='目標前進速度 m/s (預設 0.5, 上限 1.0)')
-_parser.add_argument('--dur', type=float, default=10.0,
-                     metavar='T', help='前進飛行時間 s (預設 10)')
-_parser.add_argument('--alt', type=float, default=1.0,
-                     metavar='Z', help='飛行高度 m (預設 1.0)')
-_args, _ = _parser.parse_known_args()   # ignore ROS remapping args
+DESIRED_VEL_MPS = 0.5    # 目標前進速度 (m/s)
+FLY_DURATION_S  = 10.0   # 前進飛行時間 (s)
+TARGET_ALT_M    = 1.0    # 飛行高度 (m)
 
-PFA_VEL_LIMIT   = 1.0                              # pfa_pos_control 硬碼上限
-TARGET_ALT_M    = _args.alt
-FLY_DURATION_S  = _args.dur
-DESIRED_VEL_MPS = _args.vel
+# pfa_pos_control 速度上限
+# 來源：src/modules/pfa_pos_control/pfa_pos_control.hpp  line 116
+#   float _speed_xy_max{1.0f};
+# constrain() 截斷所有超過此值的水平速度命令（無法透過參數調整）
+PFA_VEL_LIMIT   = 1.0
 
 STOP_RAMP_S     = 2.0    # 減速爬坡時間 (s)
 HOVER_STABLE_S  = 3.0    # 起飛穩定判斷連續秒數
