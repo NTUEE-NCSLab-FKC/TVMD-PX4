@@ -5,6 +5,16 @@ TVMD Wrench → Per-Agent Thrust Allocation Solver
 給定期望 wrench [Fx, Fy, Fz, Tx, Ty, Tz]，
 計算各 agent 的推力向量、推力大小與傾斜角度。
 
+■ 速度 / 角速度 → 期望 wrench（Newton-Euler 逆動力學）
+  給定 v_des（3D 線速度）和 ω_des（3D 角速度）：
+    F_body = Rᵀ · (m·v̇_des + m·g_world)      ← 線性動力學
+    τ_body = I·ω̇_des + ω × (I·ω)             ← 旋轉動力學
+
+  常見情況：
+    等速飛行（v̇=0）  → F_z = m·g（純懸停），F_x=F_y=0
+    前向加速       → F_x += m·a_x（慣性力）
+    偏航（ω̇=0）   → τ ≈ ω × (I·ω)（陀螺項，慢轉時≈0）
+
 ■ 完整控制鏈
   DESIRED_WRENCH [Fx, Fy, Fz, Tx, Ty, Tz]
     ↓ [pfa_pos_control]
@@ -41,10 +51,34 @@ import math
 # ─────────────────────────────────────────────────────────────
 # Configuration ← 使用者修改這裡
 # ─────────────────────────────────────────────────────────────
+# 模式 A：直接給 wrench（N, N·m），機體 NWU 系
+# 模式 B：給速度 + 角速度，自動計算期望 wrench
+USE_VELOCITY_INPUT = True   # True = 模式 B，False = 模式 A
 
-# 期望 wrench [Fx, Fy, Fz, Tx, Ty, Tz]（N, N·m）機體 NWU 系
-# 懸停示例：Fz = m*g ≈ 13.7 N（NWU 中向上 = 正）
+# ── 模式 A：期望 wrench ──
+# 懸停：Fz ≈ m*g = 13.7 N（NWU 向上 = 正）
 DESIRED_WRENCH = [1.0, 1.0, 14.0, 0.0, 0.0, 0.0]
+
+# ── 模式 B：速度 + 角速度 → 自動推導 wrench ──
+# 線速度（NWU：+x=前, +y=左, +z=上）單位：m/s
+V_DES     = [0.5, 0.0, 0.0]   # 期望線速度（等速時不需額外水平力）
+V_DOT_DES = [0.5, 0.0, 0.0]   # 期望線加速度（m/s²，=0 表等速）
+
+# 角速度（NWU：+x=右滾, +y=仰頭, +z=左偏航）單位：rad/s
+W_DES     = [0.0, 0.0, 0.0]   # 期望角速度
+W_DOT_DES = [0.0, 0.0, 0.0]   # 期望角加速度（rad/s²）
+W_CURRENT = [0.0, 0.0, 0.0]   # 當前角速度（用於陀螺項計算）
+
+# 當前姿態（用於重力旋轉到機體系）
+ROLL_DEG  = 0.0   # deg（NWU：右翼下壓 = 正）
+PITCH_DEG = 0.0   # deg（NWU：抬頭 = 正）
+YAW_DEG   = 0.0   # deg（NWU：左偏 = 正）
+
+# 慣性矩陣（kg·m²，NWU 機體系，對角近似）
+# 來源：VEH_AGENT_IXX / IYY / IZZ 參數
+I_XX = 0.015   # Roll 軸
+I_YY = 0.015   # Pitch 軸
+I_ZZ = 0.025   # Yaw 軸
 
 # ─────────────────────────────────────────────────────────────
 # 韌體與車體參數（對應 13300_generic_vtol_tvmd）
@@ -131,6 +165,57 @@ def hat_mat(v):
         [-v[1],  v[0],  0   ],
     ]
 
+def cross3(a, b):
+    """3D 向量外積 a × b。"""
+    return [
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0],
+    ]
+
+def euler_to_R(roll_rad, pitch_rad, yaw_rad):
+    """ZYX Euler 角 → 旋轉矩陣 R（機體 NWU → 世界 NWU）。"""
+    cr, sr = math.cos(roll_rad), math.sin(roll_rad)
+    cp, sp = math.cos(pitch_rad), math.sin(pitch_rad)
+    cy, sy = math.cos(yaw_rad), math.sin(yaw_rad)
+    return [
+        [cy*cp,  cy*sp*sr - sy*cr,  cy*sp*cr + sy*sr],
+        [sy*cp,  sy*sp*sr + cy*cr,  sy*sp*cr - cy*sr],
+        [-sp,    cp*sr,             cp*cr            ],
+    ]
+
+def velocity_to_wrench(v_dot_des, w_dot_des, w_current,
+                       roll_rad, pitch_rad, yaw_rad,
+                       mass, i_xx, i_yy, i_zz, g=9.81):
+    """
+    Newton-Euler 逆動力學：由期望加速度計算所需 wrench（機體 NWU 系）。
+
+    線性：F_body = Rᵀ · (m·v̇_des_world + m·[0,0,g])
+        - g_world=[0,0,-g]（NWU，重力向下）
+        - F_ext_world = m·v̇_des - m·g_world = m·v̇_des + m·[0,0,g]
+    旋轉：τ_body = I·ω̇_des + ω_current × (I·ω_current)
+    """
+    R = euler_to_R(roll_rad, pitch_rad, yaw_rad)
+    Rt = mat_T(R)
+
+    # 世界系所需推力（抵消重力 + 提供期望加速度）
+    F_world = [
+        mass * v_dot_des[0],
+        mass * v_dot_des[1],
+        mass * v_dot_des[2] + mass * g,
+    ]
+    F_body = mv_mul(Rt, F_world)
+
+    # 陀螺項：ω × (I·ω)
+    I_diag = [i_xx, i_yy, i_zz]
+    Iw = [I_diag[j] * w_current[j] for j in range(3)]
+    gyro = cross3(w_current, Iw)
+
+    # 所需力矩：τ = I·ω̇ + ω×(I·ω)
+    tau_body = [I_diag[j] * w_dot_des[j] + gyro[j] for j in range(3)]
+
+    return F_body, tau_body
+
 def Rz_mat(psi_rad):
     c, s = math.cos(psi_rad), math.sin(psi_rad)
     return [
@@ -185,17 +270,45 @@ def parse_agent(f3):
 # Main
 # ─────────────────────────────────────────────────────────────
 def main():
-    Fx, Fy, Fz, Tx, Ty, Tz = DESIRED_WRENCH
-    # 韌體內部順序：[τx, τy, τz, fx, fy, fz]
-    W = [Tx, Ty, Tz, Fx, Fy, Fz]
-
     print("=" * 72)
     print("  TVMD Wrench → Per-Agent Allocation Solver")
     print("=" * 72)
-    print(f"\n期望 wrench（機體 FRD）：")
-    print(f"  力  ：Fx={Fx:+8.3f} N    Fy={Fy:+8.3f} N    Fz={Fz:+8.3f} N")
-    print(f"  力矩：Tx={Tx:+8.3f} N·m  Ty={Ty:+8.3f} N·m  Tz={Tz:+8.3f} N·m")
+
+    if USE_VELOCITY_INPUT:
+        # ── 模式 B：速度 / 角速度 → 期望 wrench ──
+        roll_r  = math.radians(ROLL_DEG)
+        pitch_r = math.radians(PITCH_DEG)
+        yaw_r   = math.radians(YAW_DEG)
+
+        F_body, tau_body = velocity_to_wrench(
+            V_DOT_DES, W_DOT_DES, W_CURRENT,
+            roll_r, pitch_r, yaw_r,
+            VEHICLE_MASS, I_XX, I_YY, I_ZZ, G,
+        )
+        Fx, Fy, Fz = F_body
+        Tx, Ty, Tz = tau_body
+
+        print(f"\n模式 B：速度 / 角速度 → 期望 wrench（Newton-Euler 逆動力學）")
+        print(f"  當前姿態：roll={ROLL_DEG:.1f}° pitch={PITCH_DEG:.1f}° yaw={YAW_DEG:.1f}°")
+        print(f"  期望線速度  v_des     = {V_DES}")
+        print(f"  期望線加速度 v_dot_des = {V_DOT_DES}  m/s²")
+        print(f"  期望角速度  w_des     = {W_DES}  rad/s")
+        print(f"  期望角加速度 w_dot_des = {W_DOT_DES}  rad/s²")
+        print(f"  當前角速度  w_current = {W_CURRENT}  rad/s")
+        print(f"\n  → 計算所需 wrench（機體 NWU）：")
+        print(f"      力  ：Fx={Fx:+8.3f} N    Fy={Fy:+8.3f} N    Fz={Fz:+8.3f} N")
+        print(f"      力矩：Tx={Tx:+8.3f} N·m  Ty={Ty:+8.3f} N·m  Tz={Tz:+8.3f} N·m")
+    else:
+        # ── 模式 A：直接給 wrench ──
+        Fx, Fy, Fz, Tx, Ty, Tz = DESIRED_WRENCH
+        print(f"\n模式 A：直接給定期望 wrench（機體 NWU）：")
+        print(f"  力  ：Fx={Fx:+8.3f} N    Fy={Fy:+8.3f} N    Fz={Fz:+8.3f} N")
+        print(f"  力矩：Tx={Tx:+8.3f} N·m  Ty={Ty:+8.3f} N·m  Tz={Tz:+8.3f} N·m")
+
     print(f"  懸停參考：Fz ≈ {VEHICLE_MASS*G:.2f} N（NWU 向上 = 正）")
+
+    # 韌體內部順序：[τx, τy, τz, fx, fy, fz]
+    W = [Tx, Ty, Tz, Fx, Fy, Fz]
 
     # ── 建有效性矩陣 ──
     B = build_B(AGENTS)
