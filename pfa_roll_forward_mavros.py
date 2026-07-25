@@ -209,10 +209,11 @@ _sp_timer = rospy.Timer(
     rospy.Duration(1.0 / CTRL_HZ),
     lambda e: sp_pub.publish(_make_sp_msg()))
 
-rospy.loginfo("Waiting for MAVROS FCU connection...")
-while not rospy.is_shutdown() and not _vehicle_state.connected:
+rospy.loginfo("Waiting for MAVROS FCU connection and ready state (status >= 3)...")
+while not rospy.is_shutdown() and not (
+        _vehicle_state.connected and _vehicle_state.system_status >= 3):
     rate.sleep()
-rospy.loginfo(f"  Connected. mode={_vehicle_state.mode}")
+rospy.loginfo(f"  Connected. FCU status={_vehicle_state.system_status}  mode={_vehicle_state.mode}")
 rospy.loginfo(f"  Roll: ±{ROLL_AMP_DEG:.0f}° × {NUM_CYCLES} cycles  "
               f"({'OK' if ROLL_AMP_DEG <= _SAT_LIMIT else f'WARNING > {_SAT_LIMIT:.1f}°'})")
 rospy.loginfo(f"  Path: {PATH_SPEED_MPS} m/s × {TRACK_DUR_S:.0f} s = {TOTAL_PATH_M:.1f} m (ENU East)")

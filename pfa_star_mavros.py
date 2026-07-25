@@ -211,10 +211,11 @@ rospy.Subscriber('/mavros/imu/data',            Imu,         _cb_imu)
 sp_pub = rospy.Publisher(
     '/mavros/setpoint_position/local', PoseStamped, queue_size=10)
 
-rospy.loginfo("Waiting for MAVROS FCU connection...")
-while not rospy.is_shutdown() and not _vehicle_state.connected:
+rospy.loginfo("Waiting for MAVROS FCU connection and ready state (status >= 3)...")
+while not rospy.is_shutdown() and not (
+        _vehicle_state.connected and _vehicle_state.system_status >= 3):
     rate.sleep()
-rospy.loginfo(f"  Connected. mode={_vehicle_state.mode}")
+rospy.loginfo(f"  Connected. FCU status={_vehicle_state.system_status}  mode={_vehicle_state.mode}")
 rospy.loginfo(f"  Five-pointed star mission plan:")
 rospy.loginfo(f"    Alt           : {TARGET_ALT_M:.0f} m (constant)")
 rospy.loginfo(f"    Outer radius  : {STAR_RADIUS_M:.1f} m")

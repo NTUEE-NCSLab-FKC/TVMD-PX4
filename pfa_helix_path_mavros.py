@@ -213,8 +213,9 @@ rospy.Subscriber('/mavros/imu/data',            Imu,         _cb_imu)
 sp_pub = rospy.Publisher(
     '/mavros/setpoint_position/local', PoseStamped, queue_size=10)
 
-rospy.loginfo("Waiting for MAVROS FCU connection...")
-while not rospy.is_shutdown() and not _vehicle_state.connected:
+rospy.loginfo("Waiting for MAVROS FCU connection and ready state (status >= 3)...")
+while not rospy.is_shutdown() and not (
+        _vehicle_state.connected and _vehicle_state.system_status >= 3):
     rate.sleep()
 rospy.loginfo(f"  Connected. FCU status={_vehicle_state.system_status}")
 rospy.loginfo(f"  Helix: R={HELIX_RADIUS_M} m, T={REV_PERIOD_S} s/rev, "
