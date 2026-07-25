@@ -41,6 +41,7 @@ from mavros_msgs.srv import (
     SetMode,     SetModeRequest,
     ParamGet,    ParamGetRequest,
     ParamSet,    ParamSetRequest,
+    ParamPull,   ParamPullRequest,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -153,6 +154,22 @@ def make_hover_setpoint(alt_m=None, yaw_rad=None):
 # MAVROS service wrappers
 # ─────────────────────────────────────────────────────────────
 
+def param_pull(force=True, timeout=15.0):
+    """Sync MAVROS parameter cache from FCU (prevents stale-cache param_set failures)."""
+    try:
+        rospy.wait_for_service('/mavros/param/pull', timeout=timeout)
+        svc = rospy.ServiceProxy('/mavros/param/pull', ParamPull)
+        res = svc(ParamPullRequest(force_pull=force))
+        if res.success:
+            rospy.loginfo(f"  param_pull: synced {res.param_received} parameters from FCU")
+        else:
+            rospy.logwarn("  param_pull: reported failure")
+        return res.success
+    except (rospy.ServiceException, rospy.ROSException) as e:
+        rospy.logwarn(f"  param_pull failed: {e}")
+        return False
+
+
 def param_set(name, value, retries=5):
     """Set PX4 parameter via /mavros/param/set service."""
     try:
@@ -235,6 +252,8 @@ while not rospy.is_shutdown() and not _vehicle_state.connected:
     rate.sleep()
 rospy.loginfo(f"  Connected. FCU status={_vehicle_state.system_status}")
 rospy.loginfo(f"  Task: alt={TARGET_ALT_M} m, roll={TARGET_ROLL_DEG}°")
+rospy.loginfo("  Syncing parameter cache from FCU...")
+param_pull()
 
 # ─────────────────────────────────────────────────────────────
 # Step 0 – 設定 PFA_DES_ROLL / PFA_DES_PITCH 為 0°（起飛前歸零）

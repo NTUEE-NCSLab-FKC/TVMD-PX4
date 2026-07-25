@@ -42,6 +42,7 @@ from mavros_msgs.srv import (
     CommandBool, CommandBoolRequest,
     SetMode,     SetModeRequest,
     ParamSet,    ParamSetRequest,
+    ParamPull,   ParamPullRequest,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -122,6 +123,22 @@ def get_y():        return _local_pose.pose.position.y
 # MAVROS service wrappers
 # ─────────────────────────────────────────────────────────────
 
+def param_pull(force=True, timeout=15.0):
+    """Sync MAVROS parameter cache from FCU (prevents stale-cache param_set failures)."""
+    try:
+        rospy.wait_for_service('/mavros/param/pull', timeout=timeout)
+        svc = rospy.ServiceProxy('/mavros/param/pull', ParamPull)
+        res = svc(ParamPullRequest(force_pull=force))
+        if res.success:
+            rospy.loginfo(f"  param_pull: synced {res.param_received} parameters from FCU")
+        else:
+            rospy.logwarn("  param_pull: reported failure")
+        return res.success
+    except (rospy.ServiceException, rospy.ROSException) as e:
+        rospy.logwarn(f"  param_pull failed: {e}")
+        return False
+
+
 def param_set(name, value, retries=5):
     try:
         rospy.wait_for_service('/mavros/param/set', timeout=5)
@@ -195,6 +212,8 @@ rospy.loginfo(f"    Climb  slope  : {PATH_SPEED_MPS:.1f} m/s horiz + {CLIMB_SPEE
 rospy.loginfo(f"    Descent slope : {PATH_SPEED_MPS:.1f} m/s horiz + {DESCENT_SPEED_MPS:.1f} m/s vert  "
               f"≈ {_DESCENT_DIST_M:.0f} m horiz / {_DESCENT_DUR_S:.0f} s")
 rospy.loginfo(f"    Total horiz   : ≈ {_TOTAL_DIST_M:.0f} m  ({_TOTAL_DUR_S:.0f} s)")
+rospy.loginfo("  Syncing parameter cache from FCU...")
+param_pull()
 
 # ─────────────────────────────────────────────────────────────
 # Step 0 – PFA attitude parameters

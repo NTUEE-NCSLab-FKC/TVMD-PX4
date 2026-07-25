@@ -43,6 +43,7 @@ from mavros_msgs.srv import (
     CommandBool, CommandBoolRequest,
     SetMode,     SetModeRequest,
     ParamSet,    ParamSetRequest,
+    ParamPull,   ParamPullRequest,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -130,6 +131,22 @@ def get_roll_deg():
 # MAVROS service wrappers
 # ─────────────────────────────────────────────────────────────
 
+def param_pull(force=True, timeout=15.0):
+    """Sync MAVROS parameter cache from FCU (prevents stale-cache param_set failures)."""
+    try:
+        rospy.wait_for_service('/mavros/param/pull', timeout=timeout)
+        svc = rospy.ServiceProxy('/mavros/param/pull', ParamPull)
+        res = svc(ParamPullRequest(force_pull=force))
+        if res.success:
+            rospy.loginfo(f"  param_pull: synced {res.param_received} parameters from FCU")
+        else:
+            rospy.logwarn("  param_pull: reported failure")
+        return res.success
+    except (rospy.ServiceException, rospy.ROSException) as e:
+        rospy.logwarn(f"  param_pull failed: {e}")
+        return False
+
+
 def param_set(name, value, retries=5):
     try:
         rospy.wait_for_service('/mavros/param/set', timeout=5)
@@ -199,6 +216,8 @@ rospy.loginfo(f"  Connected. mode={_vehicle_state.mode}")
 rospy.loginfo(f"  Roll: ±{ROLL_AMP_DEG:.0f}° × {NUM_CYCLES} cycles  "
               f"({'OK' if ROLL_AMP_DEG <= _SAT_LIMIT else f'WARNING > {_SAT_LIMIT:.1f}°'})")
 rospy.loginfo(f"  Path: {PATH_SPEED_MPS} m/s × {TRACK_DUR_S:.0f} s = {TOTAL_PATH_M:.1f} m (ENU East)")
+rospy.loginfo("  Syncing parameter cache from FCU...")
+param_pull()
 
 # ─────────────────────────────────────────────────────────────
 # Step 0 – PFA parameters

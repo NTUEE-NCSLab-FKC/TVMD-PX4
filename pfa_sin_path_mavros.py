@@ -39,6 +39,7 @@ from mavros_msgs.srv import (
     CommandBool, CommandBoolRequest,
     SetMode,     SetModeRequest,
     ParamSet,    ParamSetRequest,
+    ParamPull,   ParamPullRequest,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -125,6 +126,22 @@ def make_setpoint(x, y, z, yaw_rad=0.0):
 # MAVROS service wrappers
 # ─────────────────────────────────────────────────────────────
 
+def param_pull(force=True, timeout=15.0):
+    """Sync MAVROS parameter cache from FCU (prevents stale-cache param_set failures)."""
+    try:
+        rospy.wait_for_service('/mavros/param/pull', timeout=timeout)
+        svc = rospy.ServiceProxy('/mavros/param/pull', ParamPull)
+        res = svc(ParamPullRequest(force_pull=force))
+        if res.success:
+            rospy.loginfo(f"  param_pull: synced {res.param_received} parameters from FCU")
+        else:
+            rospy.logwarn("  param_pull: reported failure")
+        return res.success
+    except (rospy.ServiceException, rospy.ROSException) as e:
+        rospy.logwarn(f"  param_pull failed: {e}")
+        return False
+
+
 def param_set(name, value, retries=5):
     try:
         rospy.wait_for_service('/mavros/param/set', timeout=5)
@@ -191,6 +208,8 @@ rospy.loginfo(f"  x: {PATH_SPEED_MPS} m/s × {TRACK_DUR_S:.0f} s = {TOTAL_PATH_M
 rospy.loginfo(f"  y: ±{SIN_AMPLITUDE_M:.1f} m sin wave, T={SIN_PERIOD_S:.0f} s, λ={SPATIAL_LAMBDA_M:.1f} m")
 rospy.loginfo(f"  Vy_max = {PEAK_VY_MPS:.2f} m/s,  cycles = {NUM_CYCLES}")
 rospy.loginfo(f"  Attitude: roll=0°, pitch=0° (PFA 位置/姿態解耦)")
+rospy.loginfo("  Syncing parameter cache from FCU...")
+param_pull()
 
 # ─────────────────────────────────────────────────────────────
 # Step 0 – 確保 PFA_DES_ROLL/PITCH = 0°（水平飛行）
