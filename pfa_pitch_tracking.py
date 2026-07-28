@@ -46,6 +46,18 @@ master.target_component = 1
 print(f"  Connected – system {master.target_system}, component {master.target_component}")
 print(f"  Task: hover at {TARGET_ALT_M} m, pitch = {TARGET_PITCH_DEG}°")
 
+# 請求 PX4 串流 SERVO_OUTPUT_RAW（msg 36）和 ACTUATOR_OUTPUT_STATUS（msg 375）
+# PX4 預設不主動發送這兩種訊息，必須用 MAV_CMD_SET_MESSAGE_INTERVAL 訂閱
+_STREAM_RATE_US = 100_000   # 10 Hz = 100 ms
+for _msg_id in (36, 375):
+    master.mav.command_long_send(
+        master.target_system, master.target_component,
+        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
+        float(_msg_id), float(_STREAM_RATE_US),
+        0, 0, 0, 0, 0)
+    time.sleep(0.05)
+print("  Requested SERVO_OUTPUT_RAW + ACTUATOR_OUTPUT_STATUS streams (10 Hz)")
+
 
 # ─────────────────────────────────────────────────────────────
 # Telemetry state cache  (由 drain() 更新)
@@ -84,14 +96,25 @@ def drain():
             r, p, y = _quat_to_euler(msg.q)
             _att_sp['roll'], _att_sp['pitch'], _att_sp['yaw'] = r, p, y
         elif t == 'SERVO_OUTPUT_RAW':
-            if msg.port == 0:   # MAIN PWM: Motor 0-3
-                _act['motors'] = [msg.servo1_raw, msg.servo2_raw,
-                                  msg.servo3_raw, msg.servo4_raw]
-            elif msg.port == 1: # AUX  PWM: Servo 0-7 (X/Y tilt per module)
-                _act['servos'] = [msg.servo1_raw, msg.servo2_raw,
-                                  msg.servo3_raw, msg.servo4_raw,
-                                  msg.servo5_raw, msg.servo6_raw,
-                                  msg.servo7_raw, msg.servo8_raw]
+            ch = [msg.servo1_raw,  msg.servo2_raw,  msg.servo3_raw,  msg.servo4_raw,
+                  msg.servo5_raw,  msg.servo6_raw,  msg.servo7_raw,  msg.servo8_raw,
+                  msg.servo9_raw,  msg.servo10_raw, msg.servo11_raw, msg.servo12_raw]
+            if msg.port == 0:
+                # 硬體：MAIN = Motor 0-3
+                # SITL：port=0 包含全部輸出，Motor 0-3 在 ch[0..3]，Servo 0-7 在 ch[4..11]
+                _act['motors'] = ch[:4]
+                if any(v and v != 65535 for v in ch[4:12]):
+                    _act['servos'] = ch[4:12]   # SITL 全輸出在同一 port
+            elif msg.port == 1: # 硬體 AUX PWM: Servo 0-7
+                _act['servos'] = ch[:8]
+        elif t == 'ACTUATOR_OUTPUT_STATUS':
+            # 備用：ACTUATOR_OUTPUT_STATUS 也攜帶全部 actuator 輸出（normalized）
+            # 若 SERVO_OUTPUT_RAW 未收到，用此作為替代
+            n = bin(msg.active).count('1') if msg.active else 0
+            if n >= 12 and not _act['motors']:
+                # normalized 0..1 for motors → 偽 PWM µs
+                _act['motors'] = [int(msg.actuator[i] * 1000 + 1000) for i in range(4)]
+                _act['servos'] = [int(msg.actuator[i] * 300  + 1500) for i in range(4, 12)]
 
 
 def _fmt_act() -> str:
