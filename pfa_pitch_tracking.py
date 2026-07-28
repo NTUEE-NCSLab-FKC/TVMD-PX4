@@ -111,17 +111,27 @@ def set_position_target(z: float = None):
 
 
 def param_set(name: str, value: float, retries: int = 5) -> bool:
-    """PARAM_SET + 等待 PARAM_VALUE ACK。
+    """PARAM_SET + 等待 PARAM_VALUE ACK，並驗證 FCU 回傳值與設定值一致。
     背景執行緒在此期間持續發送 setpoint，防止 OFFBOARD 掉出。
+
+    成功條件：
+      1. param_id 符合（排除 MAVProxy 轉發的其他參數 ACK）
+      2. param_value 與 value 誤差 < 0.01（排除舊快取造成的假 OK）
     """
     nb = name.encode('utf-8')
-    for _ in range(retries):
+    for attempt in range(retries):
         master.mav.param_set_send(
             master.target_system, master.target_component,
             nb, float(value), mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
         ack = master.recv_match(type='PARAM_VALUE', blocking=True, timeout=2)
         if ack and ack.param_id.rstrip('\x00') == name:
-            return True
+            actual = ack.param_value
+            if abs(actual - value) < 0.01:
+                print(f"    FCU ACK: {name} = {actual:.4f}  (sent {value:.4f})  ✓")
+                return True
+            else:
+                print(f"    FCU ACK mismatch: {name} = {actual:.4f}  (sent {value:.4f})"
+                      f"  retry {attempt+1}/{retries}")
         time.sleep(0.3)
     return False
 
