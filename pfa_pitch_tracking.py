@@ -346,9 +346,9 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
         time.sleep(0.15)
         drain()
         sp_deg = math.degrees(_att_sp['pitch'])
-        match  = abs(sp_deg - next_pitch) < 2.0
-        print(f"  att_sp pitch = {sp_deg:.1f}°  "
-              f"({'matches ✓' if match else f'MISMATCH — pfa_pos_control 未套用新值?'})")
+        # vehicle_attitude_setpoint (via ATTITUDE_TARGET MAVLink stream)
+        # 在 TVMD 6DOF 架構下此值可能維持 0°（控制路徑走 thrust/torque setpoint）
+        print(f"  vehicle_attitude_setpoint pitch = {sp_deg:.1f}°  (from ATTITUDE_TARGET)")
     else:
         print("  PARAM_SET FAILED")
     current_pitch_cmd = next_pitch
@@ -363,10 +363,11 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
         alt    = -_ned['z']
         p_deg  = math.degrees(_att['pitch'])
         sp_deg = math.degrees(_att_sp['pitch'])
+        err    = p_deg - current_pitch_cmd
         now    = time.time()
         if now - last_print > 0.5:
             print(f"    alt={alt:.2f} m  pitch_cmd={current_pitch_cmd:.1f}°  "
-                  f"att_sp={sp_deg:.1f}°  pitch_now={p_deg:.1f}°")
+                  f"veh_att_sp={sp_deg:.1f}°  pitch_now={p_deg:.1f}°  err={err:+.1f}°")
             last_print = now
         time.sleep(0.05)
 
@@ -375,8 +376,8 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
 # ─────────────────────────────────────────────────────────────
 print(f"\n[Step 6] Holding pitch={TARGET_PITCH_DEG:.0f}°, alt={TARGET_ALT_M} m "
       f"for {TRACK_PHASE_DUR:.0f} s...")
-print(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'PitchCmd':>9}  {'AttSp':>7}  {'PitchNow':>9}")
-print("  " + "─" * 56)
+print(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'PitchCmd':>9}  {'VehAttSp':>9}  {'PitchNow':>9}  {'PitchErr':>9}")
+print("  " + "─" * 72)
 
 track_start = time.time()
 last_print  = 0.0
@@ -389,12 +390,13 @@ while time.time() - track_start < TRACK_PHASE_DUR:
     alt_err = TARGET_ALT_M - alt
     p_deg   = math.degrees(_att['pitch'])
     sp_deg  = math.degrees(_att_sp['pitch'])
+    p_err   = p_deg - TARGET_PITCH_DEG
     elapsed = time.time() - track_start
 
     now = time.time()
     if now - last_print > 0.5:
         print(f"  {elapsed:6.1f}s  {alt:6.2f}m  {alt_err:+7.2f}m  "
-              f"{TARGET_PITCH_DEG:8.1f}°  {sp_deg:6.1f}°  {p_deg:8.1f}°")
+              f"{TARGET_PITCH_DEG:8.1f}°  {sp_deg:8.1f}°  {p_deg:8.1f}°  {p_err:+8.1f}°")
         last_print = now
     time.sleep(0.05)
 
