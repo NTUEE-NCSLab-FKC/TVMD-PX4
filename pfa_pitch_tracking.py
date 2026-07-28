@@ -96,7 +96,7 @@ def drain():
 
 def _fmt_act() -> str:
     """格式化馬達油門 % 和舵機角度，用於 log 輸出。
-    舵機範圍 ±30°，1000µs=-30°，1500µs=0°，2000µs=+30°。
+    舵機範圍 ±30°，1200µs=-30°，1500µs=0°，1800µs=+30°。
     每 Module 兩顆：servo[2k]=X軸，servo[2k+1]=Y軸。
     """
     m, s = _act['motors'], _act['servos']
@@ -104,7 +104,7 @@ def _fmt_act() -> str:
         return "(no actuator data)"
     pct = [(v - 1000) / 10.0 for v in m]
     motor_s = f"motors {pct[0]:.0f}%,{pct[1]:.0f}%,{pct[2]:.0f}%,{pct[3]:.0f}%"
-    ang = [(v - 1500) / 500.0 * 30.0 for v in s]
+    ang = [(v - 1500) / 300.0 * 30.0 for v in s]
     servo_s = (f"servos(X°,Y°) "
                f"M0({ang[0]:+.1f},{ang[1]:+.1f}) "
                f"M1({ang[2]:+.1f},{ang[3]:+.1f}) "
