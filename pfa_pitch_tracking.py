@@ -50,12 +50,22 @@ print(f"  Task: hover at {TARGET_ALT_M} m, pitch = {TARGET_PITCH_DEG}°")
 # ─────────────────────────────────────────────────────────────
 # Telemetry state cache  (由 drain() 更新)
 # ─────────────────────────────────────────────────────────────
-_ned = {'x': 0.0, 'y': 0.0, 'z': -0.01}   # LOCAL_POSITION_NED
-_att = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}  # ATTITUDE
+_ned    = {'x': 0.0, 'y': 0.0, 'z': -0.01}       # LOCAL_POSITION_NED
+_att    = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}  # ATTITUDE (actual)
+_att_sp = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}  # ATTITUDE_TARGET (pfa_pos_control setpoint)
+
+
+def _quat_to_euler(q):
+    """四元數 [w, x, y, z] → (roll, pitch, yaw) rad。"""
+    w, x, y, z = q[0], q[1], q[2], q[3]
+    roll  = math.atan2(2*(w*x + y*z), 1 - 2*(x*x + y*y))
+    pitch = math.asin(max(-1.0, min(1.0, 2*(w*y - z*x))))
+    yaw   = math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z))
+    return roll, pitch, yaw
 
 
 def drain():
-    """非阻塞排空 socket 緩衝，更新 _ned / _att。
+    """非阻塞排空 socket 緩衝，更新 _ned / _att / _att_sp。
     在飛行迴圈最前面呼叫，確保 recv_match 不占用 setpoint 發送視窗。
     """
     while True:
@@ -67,6 +77,9 @@ def drain():
             _ned['x'], _ned['y'], _ned['z'] = msg.x, msg.y, msg.z
         elif t == 'ATTITUDE':
             _att['roll'], _att['pitch'], _att['yaw'] = msg.roll, msg.pitch, msg.yaw
+        elif t == 'ATTITUDE_TARGET':
+            r, p, y = _quat_to_euler(msg.q)
+            _att_sp['roll'], _att_sp['pitch'], _att_sp['yaw'] = r, p, y
 
 
 # ─────────────────────────────────────────────────────────────
@@ -328,7 +341,16 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
 
     print(f"  PARAM_SET PFA_DES_PITCH = {next_pitch:.1f}° ... ", end='', flush=True)
     ok = param_set('PFA_DES_PITCH', next_pitch)   # 背景執行緒在此期間維持 setpoint
-    print("OK" if ok else "FAILED")
+    if ok:
+        # 等一個 pfa_pos_control Run() 循環（~10 ms）讓 ATTITUDE_TARGET 更新
+        time.sleep(0.15)
+        drain()
+        sp_deg = math.degrees(_att_sp['pitch'])
+        match  = abs(sp_deg - next_pitch) < 2.0
+        print(f"  att_sp pitch = {sp_deg:.1f}°  "
+              f"({'matches ✓' if match else f'MISMATCH — pfa_pos_control 未套用新值?'})")
+    else:
+        print("  PARAM_SET FAILED")
     current_pitch_cmd = next_pitch
 
     # 等待姿態響應，同時持續發 setpoint
@@ -338,12 +360,13 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
         drain()
         set_position_target()
 
-        alt   = -_ned['z']
-        p_deg = math.degrees(_att['pitch'])
-        now   = time.time()
+        alt    = -_ned['z']
+        p_deg  = math.degrees(_att['pitch'])
+        sp_deg = math.degrees(_att_sp['pitch'])
+        now    = time.time()
         if now - last_print > 0.5:
             print(f"    alt={alt:.2f} m  pitch_cmd={current_pitch_cmd:.1f}°  "
-                  f"pitch_now={p_deg:.1f}°")
+                  f"att_sp={sp_deg:.1f}°  pitch_now={p_deg:.1f}°")
             last_print = now
         time.sleep(0.05)
 
@@ -352,8 +375,8 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
 # ─────────────────────────────────────────────────────────────
 print(f"\n[Step 6] Holding pitch={TARGET_PITCH_DEG:.0f}°, alt={TARGET_ALT_M} m "
       f"for {TRACK_PHASE_DUR:.0f} s...")
-print(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'PitchCmd':>9}  {'PitchNow':>9}")
-print("  " + "─" * 46)
+print(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'PitchCmd':>9}  {'AttSp':>7}  {'PitchNow':>9}")
+print("  " + "─" * 56)
 
 track_start = time.time()
 last_print  = 0.0
@@ -365,12 +388,13 @@ while time.time() - track_start < TRACK_PHASE_DUR:
     alt     = -_ned['z']
     alt_err = TARGET_ALT_M - alt
     p_deg   = math.degrees(_att['pitch'])
+    sp_deg  = math.degrees(_att_sp['pitch'])
     elapsed = time.time() - track_start
 
     now = time.time()
     if now - last_print > 0.5:
         print(f"  {elapsed:6.1f}s  {alt:6.2f}m  {alt_err:+7.2f}m  "
-              f"{TARGET_PITCH_DEG:8.1f}°  {p_deg:8.1f}°")
+              f"{TARGET_PITCH_DEG:8.1f}°  {sp_deg:6.1f}°  {p_deg:8.1f}°")
         last_print = now
     time.sleep(0.05)
 
