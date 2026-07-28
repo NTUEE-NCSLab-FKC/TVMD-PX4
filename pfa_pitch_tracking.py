@@ -53,6 +53,9 @@ print(f"  Task: hover at {TARGET_ALT_M} m, pitch = {TARGET_PITCH_DEG}°")
 _ned    = {'x': 0.0, 'y': 0.0, 'z': -0.01}       # LOCAL_POSITION_NED
 _att    = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}  # ATTITUDE (actual)
 _att_sp = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}  # ATTITUDE_TARGET (pfa_pos_control setpoint)
+# SERVO_OUTPUT_RAW: port=0 → 4 motors (Main PWM), port=1 → 8 servos (Aux PWM)
+# Motor throttle: (pwm - 1000) / 10.0 [%];  Servo tilt: pwm - 1500 [µs from center]
+_act = {'motors': [], 'servos': []}               # SERVO_OUTPUT_RAW
 
 
 def _quat_to_euler(q):
@@ -65,7 +68,7 @@ def _quat_to_euler(q):
 
 
 def drain():
-    """非阻塞排空 socket 緩衝，更新 _ned / _att / _att_sp。
+    """非阻塞排空 socket 緩衝，更新 _ned / _att / _att_sp / _act。
     在飛行迴圈最前面呼叫，確保 recv_match 不占用 setpoint 發送視窗。
     """
     while True:
@@ -80,6 +83,32 @@ def drain():
         elif t == 'ATTITUDE_TARGET':
             r, p, y = _quat_to_euler(msg.q)
             _att_sp['roll'], _att_sp['pitch'], _att_sp['yaw'] = r, p, y
+        elif t == 'SERVO_OUTPUT_RAW':
+            if msg.port == 0:   # MAIN PWM: Motor 0-3
+                _act['motors'] = [msg.servo1_raw, msg.servo2_raw,
+                                  msg.servo3_raw, msg.servo4_raw]
+            elif msg.port == 1: # AUX  PWM: Servo 0-7 (X/Y tilt per module)
+                _act['servos'] = [msg.servo1_raw, msg.servo2_raw,
+                                  msg.servo3_raw, msg.servo4_raw,
+                                  msg.servo5_raw, msg.servo6_raw,
+                                  msg.servo7_raw, msg.servo8_raw]
+
+
+def _fmt_act() -> str:
+    """格式化馬達油門 % 和舵機偏移 µs，用於 log 輸出。"""
+    m, s = _act['motors'], _act['servos']
+    if not m or not s:
+        return "(no actuator data)"
+    pct = [(v - 1000) / 10.0 for v in m]
+    motor_s = f"motors {pct[0]:.0f}%,{pct[1]:.0f}%,{pct[2]:.0f}%,{pct[3]:.0f}%"
+    # 每個 Module 兩顆舵機：[X偏,Y偏] µs
+    sv = [v - 1500 for v in s]
+    servo_s = (f"servos Δµs "
+               f"M0({sv[0]:+d},{sv[1]:+d}) "
+               f"M1({sv[2]:+d},{sv[3]:+d}) "
+               f"M2({sv[4]:+d},{sv[5]:+d}) "
+               f"M3({sv[6]:+d},{sv[7]:+d})")
+    return f"{motor_s}  {servo_s}"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -342,13 +371,14 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
     print(f"  PARAM_SET PFA_DES_PITCH = {next_pitch:.1f}° ... ", end='', flush=True)
     ok = param_set('PFA_DES_PITCH', next_pitch)   # 背景執行緒在此期間維持 setpoint
     if ok:
-        # 等一個 pfa_pos_control Run() 循環（~10 ms）讓 ATTITUDE_TARGET 更新
+        # 等待 pfa_pos_control 一個 Run() 循環 + 馬達響應
         time.sleep(0.15)
         drain()
         sp_deg = math.degrees(_att_sp['pitch'])
         # vehicle_attitude_setpoint (via ATTITUDE_TARGET MAVLink stream)
         # 在 TVMD 6DOF 架構下此值可能維持 0°（控制路徑走 thrust/torque setpoint）
         print(f"  vehicle_attitude_setpoint pitch = {sp_deg:.1f}°  (from ATTITUDE_TARGET)")
+        print(f"  {_fmt_act()}")
     else:
         print("  PARAM_SET FAILED")
     current_pitch_cmd = next_pitch
@@ -379,8 +409,9 @@ print(f"\n[Step 6] Holding pitch={TARGET_PITCH_DEG:.0f}°, alt={TARGET_ALT_M} m 
 print(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'PitchCmd':>9}  {'VehAttSp':>9}  {'PitchNow':>9}  {'PitchErr':>9}")
 print("  " + "─" * 72)
 
-track_start = time.time()
-last_print  = 0.0
+track_start    = time.time()
+last_print     = 0.0
+last_act_print = 0.0   # 每 5 s 輸出一次完整 actuator 狀態
 
 while time.time() - track_start < TRACK_PHASE_DUR:
     drain()
@@ -398,6 +429,11 @@ while time.time() - track_start < TRACK_PHASE_DUR:
         print(f"  {elapsed:6.1f}s  {alt:6.2f}m  {alt_err:+7.2f}m  "
               f"{TARGET_PITCH_DEG:8.1f}°  {sp_deg:8.1f}°  {p_deg:8.1f}°  {p_err:+8.1f}°")
         last_print = now
+
+    if now - last_act_print > 5.0:
+        print(f"  [Act @ {elapsed:.0f}s] {_fmt_act()}")
+        last_act_print = now
+
     time.sleep(0.05)
 
 print("\n  Attitude tracking complete.")
