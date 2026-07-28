@@ -1,0 +1,381 @@
+#!/usr/bin/env python3
+"""
+PFA Pitch Tracking Task (pymavlink) — non-blocking 版本
+=========================================================
+懸停於 TARGET_ALT_M，pitch 漸進至 TARGET_PITCH_DEG 並維持追蹤。
+
+修正：
+  1. drain() — 非阻塞排空訊息緩衝，讓飛行迴圈不因 recv_match(blocking=True)
+               中斷 setpoint 流，避免 OFFBOARD 500ms 超時掉出。
+  2. 背景 setpoint 執行緒 — param_set() 本身需等 PARAM_VALUE ACK (~1.5 s)，
+               期間主執行緒無法發送 setpoint。背景執行緒確保 setpoint 在
+               param_set 阻塞期間仍以 25 Hz 持續發出。
+
+Connection: udp:127.0.0.1:14550
+"""
+
+import time
+import sys
+import math
+import threading
+from pymavlink import mavutil
+
+# ─────────────────────────────────────────────────────────────
+# Configuration
+# ─────────────────────────────────────────────────────────────
+TARGET_ALT_M      = 0.4     # 懸停高度 (m)
+TARGET_PITCH_DEG  = 30.0    # 期望 pitch (deg, 正值 = nose up)
+TARGET_ROLL_DEG   = 0.0
+
+HOVER_PHASE_DUR   = 8.0     # 穩定後的水平懸停保持時間 (s)
+PITCH_RAMP_TIME   = 4.0     # pitch 從 0° 爬升到目標角度的總時間 (s)
+TRACK_PHASE_DUR   = 30.0    # 維持目標 pitch 的追蹤時長 (s)
+PARAM_STEP_DEG    = 5.0     # 每次 PARAM_SET 的步進量 (deg)
+
+ALT_TOL           = 0.15    # 懸停高度容差 (m)
+HOVER_STABLE_TIME = 3.0     # 判定穩定懸停所需的持續時間 (s)
+
+# ─────────────────────────────────────────────────────────────
+# Connect
+# ─────────────────────────────────────────────────────────────
+print("Connecting to PX4 (udp:127.0.0.1:14550)...")
+master = mavutil.mavlink_connection('udp:127.0.0.1:14550')
+master.wait_heartbeat()
+master.target_system    = master.target_system
+master.target_component = 1
+print(f"  Connected – system {master.target_system}, component {master.target_component}")
+print(f"  Task: hover at {TARGET_ALT_M} m, pitch = {TARGET_PITCH_DEG}°")
+
+
+# ─────────────────────────────────────────────────────────────
+# Telemetry state cache  (由 drain() 更新)
+# ─────────────────────────────────────────────────────────────
+_ned = {'x': 0.0, 'y': 0.0, 'z': -0.01}   # LOCAL_POSITION_NED
+_att = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}  # ATTITUDE
+
+
+def drain():
+    """非阻塞排空 socket 緩衝，更新 _ned / _att。
+    在飛行迴圈最前面呼叫，確保 recv_match 不占用 setpoint 發送視窗。
+    """
+    while True:
+        msg = master.recv_match(blocking=False)
+        if msg is None:
+            break
+        t = msg.get_type()
+        if t == 'LOCAL_POSITION_NED':
+            _ned['x'], _ned['y'], _ned['z'] = msg.x, msg.y, msg.z
+        elif t == 'ATTITUDE':
+            _att['roll'], _att['pitch'], _att['yaw'] = msg.roll, msg.pitch, msg.yaw
+
+
+# ─────────────────────────────────────────────────────────────
+# Background setpoint thread
+# 在 param_set() 阻塞期間維持 25 Hz setpoint，防止 OFFBOARD 超時掉出
+# ─────────────────────────────────────────────────────────────
+_sp_z      = -TARGET_ALT_M     # 目前 setpoint z（主執行緒可更新）
+_sp_active = threading.Event()
+_sp_active.set()
+
+
+def _sp_worker():
+    while _sp_active.is_set():
+        master.mav.set_position_target_local_ned_send(
+            0, master.target_system, master.target_component,
+            mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+            0b0000111111111000,
+            0.0, 0.0, _sp_z,
+            0, 0, 0, 0, 0, 0, 0, 0)
+        time.sleep(0.04)    # 25 Hz
+
+
+_sp_thread = threading.Thread(target=_sp_worker, daemon=True)
+_sp_thread.start()
+
+
+# ─────────────────────────────────────────────────────────────
+# MAVLink helpers
+# ─────────────────────────────────────────────────────────────
+
+def set_position_target(z: float = None):
+    """發送 NED 位置 setpoint，z 預設用 _sp_z。主執行緒呼叫版本。"""
+    global _sp_z
+    if z is not None:
+        _sp_z = z
+    master.mav.set_position_target_local_ned_send(
+        0, master.target_system, master.target_component,
+        mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+        0b0000111111111000,
+        0.0, 0.0, _sp_z,
+        0, 0, 0, 0, 0, 0, 0, 0)
+
+
+def param_set(name: str, value: float, retries: int = 5) -> bool:
+    """PARAM_SET + 等待 PARAM_VALUE ACK。
+    背景執行緒在此期間持續發送 setpoint，防止 OFFBOARD 掉出。
+    """
+    nb = name.encode('utf-8')
+    for _ in range(retries):
+        master.mav.param_set_send(
+            master.target_system, master.target_component,
+            nb, float(value), mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
+        ack = master.recv_match(type='PARAM_VALUE', blocking=True, timeout=2)
+        if ack and ack.param_id.rstrip('\x00') == name:
+            return True
+        time.sleep(0.3)
+    return False
+
+
+def param_get(name: str):
+    master.mav.param_request_read_send(
+        master.target_system, master.target_component,
+        name.encode('utf-8'), -1)
+    msg = master.recv_match(type='PARAM_VALUE', blocking=True, timeout=3)
+    if msg and msg.param_id.rstrip('\x00') == name:
+        return msg.param_value
+    return None
+
+
+def wait_for_mode(target_main_mode: int, timeout: float = 5) -> bool:
+    start = time.time()
+    while time.time() - start < timeout:
+        msg = master.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
+        if msg and ((msg.custom_mode >> 16) & 0xFF) == target_main_mode:
+            return True
+    return False
+
+
+def set_mode_offboard():
+    master.mav.command_long_send(
+        master.target_system, master.target_component,
+        mavutil.mavlink.MAV_CMD_DO_SET_MODE, 0,
+        float(mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED),
+        6.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+
+def set_mode_land():
+    master.mav.command_long_send(
+        master.target_system, master.target_component,
+        mavutil.mavlink.MAV_CMD_DO_SET_MODE, 0,
+        float(mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED),
+        4.0, 6.0, 0.0, 0.0, 0.0, 0.0)
+
+
+def arm(force: bool = False):
+    master.mav.command_long_send(
+        master.target_system, master.target_component,
+        mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0,
+        1.0, 21196.0 if force else 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+
+# ─────────────────────────────────────────────────────────────
+# Step 0 – 設定 PFA_DES_PITCH / PFA_DES_ROLL 參數
+# ─────────────────────────────────────────────────────────────
+print("\n[Step 0] Configuring PFA attitude target parameters...")
+
+current_pitch_param = param_get('PFA_DES_PITCH')
+if current_pitch_param is None:
+    print("  WARNING: Could not read PFA_DES_PITCH. Check firmware.")
+else:
+    print(f"  PFA_DES_PITCH current = {current_pitch_param:.1f}°")
+
+print("  Setting PFA_DES_ROLL  = 0°  ... ", end='', flush=True)
+print("OK" if param_set('PFA_DES_ROLL', 0.0) else "FAILED (continuing)")
+
+print("  Setting PFA_DES_PITCH = 0°  ... ", end='', flush=True)
+print("OK" if param_set('PFA_DES_PITCH', 0.0) else "FAILED (continuing)")
+
+# ─────────────────────────────────────────────────────────────
+# Step 1 – Pre-flight check
+# ─────────────────────────────────────────────────────────────
+print("\n[Step 1] Checking local position estimate...")
+msg = master.recv_match(type='LOCAL_POSITION_NED', blocking=True, timeout=5)
+if msg is None:
+    print("  ERROR: No LOCAL_POSITION_NED received. Is EKF2 running?")
+    _sp_active.clear()
+    sys.exit(1)
+_ned['x'], _ned['y'], _ned['z'] = msg.x, msg.y, msg.z
+print(f"  OK – NED position: ({_ned['x']:.2f}, {_ned['y']:.2f}, {_ned['z']:.2f})")
+
+# ─────────────────────────────────────────────────────────────
+# Step 2 – Stream setpoints → OFFBOARD → Arm
+# ─────────────────────────────────────────────────────────────
+print(f"\n[Step 2] Streaming initial setpoints (5 s, z={-TARGET_ALT_M:.1f} NED)...")
+set_position_target(-TARGET_ALT_M)   # 更新 _sp_z，背景執行緒開始發
+time.sleep(5.0)
+
+print("  Requesting OFFBOARD mode...")
+set_mode_offboard()
+if wait_for_mode(6):
+    print("  OFFBOARD confirmed.")
+else:
+    time.sleep(2.5)
+    set_mode_offboard()
+    print("  OFFBOARD confirmed." if wait_for_mode(6)
+          else "  WARNING: not confirmed, continuing.")
+
+print("  Arming...")
+time.sleep(1.0)
+arm()
+
+armed = False
+for _ in range(100):
+    hb = master.recv_match(type='HEARTBEAT', blocking=False)
+    if hb and (hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
+        armed = True
+        break
+    time.sleep(0.05)
+
+if not armed:
+    arm(force=True)
+    for _ in range(100):
+        hb = master.recv_match(type='HEARTBEAT', blocking=False)
+        if hb and (hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED):
+            armed = True
+            break
+        time.sleep(0.05)
+
+if not armed:
+    print("  ERROR: Failed to arm.")
+    _sp_active.clear()
+    sys.exit(1)
+print("  Armed.")
+
+# ─────────────────────────────────────────────────────────────
+# Step 3 – 穩定懸停至 TARGET_ALT_M（PFA_DES_PITCH = 0°）
+# ─────────────────────────────────────────────────────────────
+print(f"\n[Step 3] Position-control hover at {TARGET_ALT_M} m  (PFA_DES_PITCH=0°)")
+print(f"  Waiting for stable hover (±{ALT_TOL} m for {HOVER_STABLE_TIME:.0f} s)...")
+
+phase_start  = time.time()
+stable_since = None
+last_print   = 0.0
+
+while True:
+    drain()                              # ← 非阻塞更新快取
+    set_position_target()               # ← 主執行緒補發（背景已在發）
+
+    alt     = -_ned['z']
+    alt_err = TARGET_ALT_M - alt
+    p_deg   = math.degrees(_att['pitch'])
+    stable_since = (stable_since or time.time()) if abs(alt_err) < ALT_TOL else None
+
+    now = time.time()
+    if now - last_print > 1.0:
+        s = now - stable_since if stable_since else 0.0
+        print(f"  alt={alt:.2f} m (err={alt_err:+.2f})  pitch={p_deg:.1f}°  "
+              f"stable={s:.1f}/{HOVER_STABLE_TIME:.0f} s")
+        last_print = now
+
+    if stable_since and (time.time() - stable_since) >= HOVER_STABLE_TIME:
+        print(f"  Stable hover at {alt:.2f} m.")
+        break
+    if time.time() - phase_start > 25.0:
+        print(f"  Hover timeout – alt={alt:.2f} m, continuing.")
+        break
+    time.sleep(0.05)
+
+# ─────────────────────────────────────────────────────────────
+# Step 4 – 保持水平懸停 HOVER_PHASE_DUR 秒
+# ─────────────────────────────────────────────────────────────
+print(f"\n[Step 4] Holding level hover for {HOVER_PHASE_DUR:.0f} s...")
+end_t      = time.time() + HOVER_PHASE_DUR
+last_print = 0.0
+
+while time.time() < end_t:
+    drain()
+    set_position_target()
+    now = time.time()
+    if now - last_print > 2.0:
+        alt   = -_ned['z']
+        p_deg = math.degrees(_att['pitch'])
+        print(f"  alt={alt:.2f} m  pitch={p_deg:.1f}°  remaining={end_t-now:.1f} s")
+        last_print = now
+    time.sleep(0.05)
+
+# ─────────────────────────────────────────────────────────────
+# Step 5 – 漸進式 pitch ramp（逐步 PARAM_SET PFA_DES_PITCH）
+#
+# 背景執行緒持續發 setpoint，param_set 的 ACK 等待（~1.5 s）
+# 不再造成 setpoint 中斷，OFFBOARD 不會因此掉出。
+# ─────────────────────────────────────────────────────────────
+PARAM_STEP_WAIT = PITCH_RAMP_TIME / (abs(TARGET_PITCH_DEG) / PARAM_STEP_DEG)
+_sat_limit = math.degrees(math.asin(0.3 / ((1.4 * 9.81) / 24.0)))
+
+print(f"\n[Step 5] Pitch ramp: 0° → {TARGET_PITCH_DEG:.0f}° "
+      f"(step={PARAM_STEP_DEG:.0f}°, interval={PARAM_STEP_WAIT:.1f} s/step)")
+print(f"  XY thrust saturation limit: ±{_sat_limit:.1f}°  "
+      f"({'OK' if abs(TARGET_PITCH_DEG) <= _sat_limit else 'WARNING: near/over saturation'})")
+
+current_pitch_cmd = 0.0
+
+while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
+    step       = math.copysign(PARAM_STEP_DEG, TARGET_PITCH_DEG - current_pitch_cmd)
+    next_pitch = current_pitch_cmd + step
+    if (step > 0 and next_pitch > TARGET_PITCH_DEG) or \
+       (step < 0 and next_pitch < TARGET_PITCH_DEG):
+        next_pitch = TARGET_PITCH_DEG
+
+    print(f"  PARAM_SET PFA_DES_PITCH = {next_pitch:.1f}° ... ", end='', flush=True)
+    ok = param_set('PFA_DES_PITCH', next_pitch)   # 背景執行緒在此期間維持 setpoint
+    print("OK" if ok else "FAILED")
+    current_pitch_cmd = next_pitch
+
+    # 等待姿態響應，同時持續發 setpoint
+    step_end   = time.time() + PARAM_STEP_WAIT
+    last_print = 0.0
+    while time.time() < step_end:
+        drain()
+        set_position_target()
+
+        alt   = -_ned['z']
+        p_deg = math.degrees(_att['pitch'])
+        now   = time.time()
+        if now - last_print > 0.5:
+            print(f"    alt={alt:.2f} m  pitch_cmd={current_pitch_cmd:.1f}°  "
+                  f"pitch_now={p_deg:.1f}°")
+            last_print = now
+        time.sleep(0.05)
+
+# ─────────────────────────────────────────────────────────────
+# Step 6 – 維持 pitch=TARGET_PITCH_DEG，持續追蹤 TRACK_PHASE_DUR 秒
+# ─────────────────────────────────────────────────────────────
+print(f"\n[Step 6] Holding pitch={TARGET_PITCH_DEG:.0f}°, alt={TARGET_ALT_M} m "
+      f"for {TRACK_PHASE_DUR:.0f} s...")
+print(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'PitchCmd':>9}  {'PitchNow':>9}")
+print("  " + "─" * 46)
+
+track_start = time.time()
+last_print  = 0.0
+
+while time.time() - track_start < TRACK_PHASE_DUR:
+    drain()
+    set_position_target()
+
+    alt     = -_ned['z']
+    alt_err = TARGET_ALT_M - alt
+    p_deg   = math.degrees(_att['pitch'])
+    elapsed = time.time() - track_start
+
+    now = time.time()
+    if now - last_print > 0.5:
+        print(f"  {elapsed:6.1f}s  {alt:6.2f}m  {alt_err:+7.2f}m  "
+              f"{TARGET_PITCH_DEG:8.1f}°  {p_deg:8.1f}°")
+        last_print = now
+    time.sleep(0.05)
+
+print("\n  Attitude tracking complete.")
+
+# ─────────────────────────────────────────────────────────────
+# Step 7 – 降落前將 PFA_DES_PITCH 歸零，切換 AUTO.LAND
+# ─────────────────────────────────────────────────────────────
+print("\n[Step 7] Resetting PFA_DES_PITCH to 0° before landing...")
+param_set('PFA_DES_PITCH', 0.0)
+time.sleep(1.0)
+
+_sp_active.clear()   # 停止背景 setpoint 執行緒
+
+print("Landing (AUTO.LAND)...")
+set_mode_land()
+time.sleep(15)
+print("Done.")
