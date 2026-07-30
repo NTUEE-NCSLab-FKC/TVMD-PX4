@@ -66,8 +66,10 @@ _ned    = {'x': 0.0, 'y': 0.0, 'z': -0.01}       # LOCAL_POSITION_NED
 _att    = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}  # ATTITUDE (actual)
 _att_sp = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}  # ATTITUDE_TARGET (pfa_pos_control setpoint)
 # SERVO_OUTPUT_RAW: port=0 → 4 motors (Main PWM), port=1 → 8 servos (Aux PWM)
-# Motor throttle: (pwm - 1000) / 10.0 [%];  Servo tilt: pwm - 1500 [µs from center]
-_act = {'motors': [], 'servos': []}               # SERVO_OUTPUT_RAW
+# SITL: 全部輸出在 port=0（ch0-3=motors, ch4-11=servos）
+# 實機: motors=port=0, servos=port=1(AUX)
+# Motor throttle: (pwm - 1000) / 10.0 [%];  Servo tilt: ±30°, center=1500µs, range=±300µs
+_act = {'motors': [], 'servos': [], 'sitl_detected': False}  # SERVO_OUTPUT_RAW
 
 
 def _quat_to_euler(q):
@@ -100,12 +102,19 @@ def drain():
                   msg.servo5_raw,  msg.servo6_raw,  msg.servo7_raw,  msg.servo8_raw,
                   msg.servo9_raw,  msg.servo10_raw, msg.servo11_raw, msg.servo12_raw]
             if msg.port == 0:
-                # 硬體：MAIN = Motor 0-3
-                # SITL：port=0 包含全部輸出，Motor 0-3 在 ch[0..3]，Servo 0-7 在 ch[4..11]
+                # MAIN PWM: Motor 0-3
+                # SITL では port=0 にすべて含まれる場合あり（Motor + Servo 合計 12ch）
                 _act['motors'] = ch[:4]
-                if any(v and v != 65535 for v in ch[4:12]):
-                    _act['servos'] = ch[4:12]   # SITL 全輸出在同一 port
-            elif msg.port == 1: # 硬體 AUX PWM: Servo 0-7
+                # Servo は ch[4..11] だが、実機では idle=1000µs で舵機ではない
+                # → 実機(port=1 あり)は port=1 から取得するため、ここでは上書きしない
+                if not _act['sitl_detected'] and any(
+                        1100 < v < 1900 for v in ch[4:12]):
+                    _act['sitl_detected'] = True
+                if _act['sitl_detected']:
+                    _act['servos'] = ch[4:12]
+            elif msg.port == 1:
+                # AUX PWM (hardware): Servo 0-7
+                _act['sitl_detected'] = False   # port=1 あり → 実機モード確定
                 _act['servos'] = ch[:8]
         elif t == 'ACTUATOR_OUTPUT_STATUS':
             # 備用：ACTUATOR_OUTPUT_STATUS 也攜帶全部 actuator 輸出（normalized）
