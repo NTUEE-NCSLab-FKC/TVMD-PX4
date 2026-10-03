@@ -61,7 +61,9 @@ PARAM_STEP_DEG   = 5.0        # 每步進量 (deg，恆正)
 ALT_TOL          = 0.15
 HOVER_STABLE_TIME = 3.0
 
-SP_RATE_HZ       = 20.0       # offboard setpoint 串流頻率 (Hz)，PX4 需 > 2 Hz
+# offboard setpoint 串流頻率 (Hz)。PX4 只要求間隔 < COM_OF_LOSS_T (1 s)；
+# 經 57600 baud 數傳 (MAV_0_RATE=1200 B/s) 時每筆 65 B，10 Hz ≈ 650 B/s 已足夠且不壅塞鏈路
+SP_RATE_HZ       = 10.0
 
 # XY 飽和限制提示
 _HOVER_THR = (1.4 * 9.81) / 24.0
@@ -79,11 +81,11 @@ print(f"  Connected – system {master.target_system}, component {master.target_
 print(f"  Task: alt={TARGET_ALT_M} m, roll={TARGET_ROLL_DEG}°")
 
 
-# 提高 LOCAL_POSITION_NED 串流頻率（GCS link 預設僅 1 Hz）
+# 提高 LOCAL_POSITION_NED 串流頻率（GCS link 預設僅 1 Hz；數傳頻寬有限，取 5 Hz）
 master.mav.command_long_send(
     master.target_system, master.target_component,
     mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
-    float(mavutil.mavlink.MAVLINK_MSG_ID_LOCAL_POSITION_NED), 100_000.0,  # 10 Hz
+    float(mavutil.mavlink.MAVLINK_MSG_ID_LOCAL_POSITION_NED), 200_000.0,  # 5 Hz
     0, 0, 0, 0, 0)
 
 

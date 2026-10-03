@@ -43,7 +43,9 @@ PARAM_STEP_DEG    = 5.0     # 每次 PARAM_SET 的步進量 (deg)
 ALT_TOL           = 0.15    # 懸停高度容差 (m)
 HOVER_STABLE_TIME = 3.0     # 判定穩定懸停所需的持續時間 (s)
 
-SP_RATE_HZ        = 20.0    # offboard setpoint 串流頻率 (Hz)，PX4 需 > 2 Hz
+# offboard setpoint 串流頻率 (Hz)。PX4 只要求間隔 < COM_OF_LOSS_T (1 s)；
+# 經 57600 baud 數傳 (MAV_0_RATE=1200 B/s) 時每筆 65 B，10 Hz ≈ 650 B/s 已足夠且不壅塞鏈路
+SP_RATE_HZ        = 10.0
 
 # ─────────────────────────────────────────────────────────────
 # Connect
@@ -58,16 +60,18 @@ print(f"  Task: hover at {TARGET_ALT_M} m, pitch = {TARGET_PITCH_DEG}°")
 
 # 請求 PX4 串流 SERVO_OUTPUT_RAW（msg 36）和 ACTUATOR_OUTPUT_STATUS（msg 375）
 # PX4 預設不主動發送這兩種訊息，必須用 MAV_CMD_SET_MESSAGE_INTERVAL 訂閱
-# LOCAL_POSITION_NED（msg 32）在 GCS link 預設僅 1 Hz，一併提高到 10 Hz
-_STREAM_RATE_US = 100_000   # 10 Hz = 100 ms
-for _msg_id in (36, 375, 32):
+# LOCAL_POSITION_NED（msg 32）在 GCS link 預設僅 1 Hz，提高到 5 Hz
+# 數傳頻寬有限（ACTUATOR_OUTPUT_STATUS 一筆 ~150 B，10 Hz 就超過 MAV_0_RATE=1200 B/s，
+# 會把其他串流的 rate_multiplier 壓低），因此監看用串流維持低頻
+_STREAMS_HZ = {36: 2.0, 375: 1.0, 32: 5.0}
+for _msg_id, _hz in _STREAMS_HZ.items():
     master.mav.command_long_send(
         master.target_system, master.target_component,
         mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
-        float(_msg_id), float(_STREAM_RATE_US),
+        float(_msg_id), 1e6 / _hz,
         0, 0, 0, 0, 0)
     time.sleep(0.05)
-print("  Requested SERVO_OUTPUT_RAW + ACTUATOR_OUTPUT_STATUS + LOCAL_POSITION_NED streams (10 Hz)")
+print("  Requested SERVO_OUTPUT_RAW 2 Hz + ACTUATOR_OUTPUT_STATUS 1 Hz + LOCAL_POSITION_NED 5 Hz")
 
 
 # ─────────────────────────────────────────────────────────────
