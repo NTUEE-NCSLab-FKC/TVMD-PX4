@@ -38,12 +38,19 @@ Task: 繞 8 字軌跡飛行，roll=pitch=0°，yaw 跟隨前進切線方向
   - 無 approach 相位（t=0 時曲線起點即為懸停中心）
   - 速度在中心交叉點連續（Lissajous 曲線特性），可直接 atan2 追蹤 yaw
 
+OFFBOARD signal lost 修正（比照 square_traj_mavros.py）：
+  原版：setpoint 只在主迴圈 sp_pub.publish()，arm_vehicle()/set_mode() 等
+        service 阻塞時 sp_pub 停止 → 超過 COM_OF_LOSS_T (1 s) 即掉回 Position mode
+  本版：rospy.Timer 在背景執行緒持續以 CTRL_HZ 發布共享 setpoint，
+        主迴圈只呼叫 set_sp() 更新內容；降落時確認進入 AUTO.LAND 後才停止 Timer
+
 執行方式：
   python3 pfa_fig8_mavros.py  (ROS 環境已 source)
 """
 
 import sys
 import math
+import threading
 
 import rospy
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
@@ -69,7 +76,7 @@ YAW_TRACK_PATH      = True   # True: yaw 跟切線方向; False: 固定 yaw=0° 
 HOVER_PHASE_DUR     = 8.0    # 起飛後定高懸停時間 (s)
 ALT_TOL             = 0.15   # 穩定懸停高度容差 (m)
 HOVER_STABLE_TIME   = 3.0    # 穩定判定時間 (s)
-CTRL_HZ             = 20     # 主迴路頻率
+CTRL_HZ             = 20     # 主迴路 / Timer 發布頻率（經 SiK 數傳時建議降到 10）
 
 # ─────────────────────────────────────────────────────────────
 # Derived
@@ -128,6 +135,26 @@ def make_setpoint(x, y, z, yaw_rad=0.0):
     sp.pose.orientation.z = q[2]
     sp.pose.orientation.w = q[3]
     return sp
+
+
+# ─────────────────────────────────────────────────────────────
+# Shared setpoint（主執行緒寫入；Timer 背景讀取並發布）
+# ─────────────────────────────────────────────────────────────
+_sp_lock = threading.Lock()
+_sp_msg  = [None]
+
+def set_sp(msg):
+    """執行緒安全地更新 setpoint（主執行緒呼叫）。"""
+    with _sp_lock:
+        _sp_msg[0] = msg
+
+def _timer_cb(_event):
+    """CTRL_HZ 背景回呼：更新 timestamp 後發布。"""
+    with _sp_lock:
+        msg = _sp_msg[0]
+    if msg is not None:
+        msg.header.stamp = rospy.Time.now()
+        sp_pub.publish(msg)
 
 
 def fig8_yaw(elapsed):
@@ -201,6 +228,9 @@ rospy.Subscriber('/mavros/imu/data',            Imu,         _cb_imu)
 sp_pub = rospy.Publisher(
     '/mavros/setpoint_position/local', PoseStamped, queue_size=10)
 
+set_sp(make_setpoint(0.0, 0.0, TARGET_ALT_M))   # 初始 setpoint（Timer 啟動前先設定）
+_sp_timer = rospy.Timer(rospy.Duration(1.0 / CTRL_HZ), _timer_cb)
+
 rospy.loginfo("Waiting for MAVROS FCU connection...")
 while not rospy.is_shutdown() and not _vehicle_state.connected:
     rate.sleep()
@@ -231,17 +261,15 @@ rospy.loginfo("  PFA_DES_PITCH = 0° ... " +
 # Step 1 – Stream setpoints → OFFBOARD → Arm
 # ─────────────────────────────────────────────────────────────
 rospy.loginfo(f"\n[Step 1] Streaming setpoints (5 s, z={TARGET_ALT_M} m)...")
-t0 = rospy.Time.now()
-while not rospy.is_shutdown() and (rospy.Time.now() - t0).to_sec() < 5.0:
-    sp_pub.publish(make_setpoint(0.0, 0.0, TARGET_ALT_M))
-    rate.sleep()
+# Timer 在背景發布，rospy.sleep() 讓主執行緒等待即可
+rospy.sleep(5.0)
 
+# arm_vehicle()/set_mode() 阻塞時，Timer 仍在背景以 CTRL_HZ 發布
 rospy.loginfo("  Requesting OFFBOARD mode...")
 set_mode('OFFBOARD')
 
 t_wait = rospy.Time.now()
 while not rospy.is_shutdown() and _vehicle_state.mode != 'OFFBOARD':
-    sp_pub.publish(make_setpoint(0.0, 0.0, TARGET_ALT_M))
     if (rospy.Time.now() - t_wait).to_sec() > 5.0:
         rospy.logwarn("  WARNING: OFFBOARD not confirmed, continuing...")
         break
@@ -253,7 +281,6 @@ arm_vehicle()
 
 t_wait = rospy.Time.now()
 while not rospy.is_shutdown() and not _vehicle_state.armed:
-    sp_pub.publish(make_setpoint(0.0, 0.0, TARGET_ALT_M))
     if (rospy.Time.now() - t_wait).to_sec() > 10.0:
         rospy.logerr("  ERROR: Failed to arm.")
         sys.exit(1)
@@ -271,7 +298,6 @@ last_log     = rospy.Time.now()
 t_phase      = rospy.Time.now()
 
 while not rospy.is_shutdown():
-    sp_pub.publish(make_setpoint(0.0, 0.0, TARGET_ALT_M))
     alt     = get_altitude()
     alt_err = TARGET_ALT_M - alt
     now     = rospy.Time.now()
@@ -299,7 +325,6 @@ rospy.loginfo(f"\n[Step 3] Hover hold for {HOVER_PHASE_DUR:.0f} s (recording 8-c
 t_end    = rospy.Time.now() + rospy.Duration(HOVER_PHASE_DUR)
 last_log = rospy.Time.now()
 while not rospy.is_shutdown() and rospy.Time.now() < t_end:
-    sp_pub.publish(make_setpoint(0.0, 0.0, TARGET_ALT_M))
     now = rospy.Time.now()
     if (now - last_log).to_sec() > 2.0:
         rospy.loginfo(f"  alt={get_altitude():.2f} m  "
@@ -339,7 +364,7 @@ while not rospy.is_shutdown():
     if YAW_TRACK_PATH:
         yaw_cmd = fig8_yaw(elapsed)
 
-    sp_pub.publish(make_setpoint(x_cmd, y_cmd, TARGET_ALT_M, yaw_rad=yaw_cmd))
+    set_sp(make_setpoint(x_cmd, y_cmd, TARGET_ALT_M, yaw_rad=yaw_cmd))
 
     if (now - last_log).to_sec() >= 0.5:
         xn, yn, _ = get_xyz()
@@ -362,7 +387,7 @@ rospy.loginfo(f"\n[Step 5] Returning to center ({cx:.1f}, {cy:.1f}) m and holdin
 t_end    = rospy.Time.now() + rospy.Duration(5.0)
 last_log = rospy.Time.now()
 while not rospy.is_shutdown() and rospy.Time.now() < t_end:
-    sp_pub.publish(make_setpoint(cx, cy, TARGET_ALT_M, yaw_rad=0.0))
+    set_sp(make_setpoint(cx, cy, TARGET_ALT_M, yaw_rad=0.0))
     now = rospy.Time.now()
     if (now - last_log).to_sec() > 1.0:
         xn, yn, _ = get_xyz()
@@ -377,5 +402,14 @@ while not rospy.is_shutdown() and rospy.Time.now() < t_end:
 # ─────────────────────────────────────────────────────────────
 rospy.loginfo("\n[Step 6] Landing (AUTO.LAND)...")
 set_mode('AUTO.LAND')
+# 確認已離開 OFFBOARD 才停止 Timer，否則會先觸發 offboard lost → Position mode
+t0 = rospy.Time.now()
+while not rospy.is_shutdown() and _vehicle_state.mode != 'AUTO.LAND':
+    if (rospy.Time.now() - t0).to_sec() > 5.0:
+        rospy.logwarn("  AUTO.LAND not confirmed, retrying...")
+        set_mode('AUTO.LAND')
+        break
+    rate.sleep()
+_sp_timer.shutdown()
 rospy.sleep(15.0)
 rospy.loginfo("Done.")
