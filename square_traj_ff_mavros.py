@@ -19,6 +19,16 @@ square_traj_mavros.py（CCW）/ square_traj_cw_mavros.py（CW）的前饋版本�
     峰值速度 = SEG_PEAK_SPEED_MPS，每邊時間 T = 1.875 × 邊長 / 峰值速度
   頂點停留 VERTEX_DWELL_S，yaw 轉向下一段方向
 
+■ 平滑起飛（避免「往上衝 → 掉下來 → 再起飛」）
+  若解鎖前就送 z = TARGET_ALT_M，pfa_pos_control 的起飛緩升（PFA_TKF_BYP=1）結束、
+  切到正常位置控制的瞬間高度誤差 ≈ TARGET_ALT_M，P 項把推力推到接近滿載 → 往上衝；
+  電流暴增造成外部電源壓降 → 推力不足又掉下來。因此：
+    1. 解鎖前 setpoint = 目前地面位置與航向（高度誤差 0）
+    2. 解鎖後維持地面位置，等 PX4 起飛緩升結束
+       （COM_SPOOLUP_TIME + MPC_TKO_RAMP_T，從飛控讀取，再加 TAKEOFF_SETTLE_S）
+    3. 以最小 jerk 曲線從地面高度爬升到 TARGET_ALT_M（峰值 CLIMB_PEAK_MPS），含前饋
+  注意：OFFBOARD 下必須 PFA_TKF_BYP = 1，否則推力上限會卡在 0.1（啟動時會檢查）。
+
 ■ 控制鏈
   set_sp() → rospy.Timer (CTRL_HZ) → /mavros/setpoint_raw/local (PositionTarget)
   → SET_POSITION_TARGET_LOCAL_NED (p + v + a + yaw) → pfa_pos_control → pfa_att_control
@@ -42,6 +52,7 @@ from mavros_msgs.srv import (
     SetMode,     SetModeRequest,
     ParamSet,    ParamSetRequest,
     ParamPull,   ParamPullRequest,
+    ParamGet,    ParamGetRequest,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -58,6 +69,11 @@ YAW_TRACK_PATH     = True   # True: yaw 追蹤前進方向; False: 固定 yaw=0�
 HOVER_PHASE_DUR    = 5.0    # 起飛後穩定等待時間 (s)
 ALT_TOL            = 0.10   # 高度穩定容忍 (m)
 HOVER_STABLE_TIME  = 3.0    # 連續穩定秒數
+
+# 平滑起飛
+CLIMB_PEAK_MPS     = 0.2    # 爬升最小 jerk 曲線的峰值速度 (m/s)
+CLIMB_MIN_S        = 3.0    # 爬升最短時間 (s)
+TAKEOFF_SETTLE_S   = 0.5    # PX4 起飛緩升結束後再多等的時間 (s)
 
 CTRL_HZ           = 20     # Timer 發布頻率（經 SiK 數傳時建議降到 10）
 LOG_PERIOD_S      = 0.5    # 追蹤狀態印出間隔 (s)
@@ -84,7 +100,12 @@ _imu_data      = Imu()
 
 
 def _cb_state(msg): global _vehicle_state; _vehicle_state = msg
-def _cb_pose(msg):  global _local_pose;    _local_pose    = msg
+_pose_received = threading.Event()
+
+def _cb_pose(msg):
+    global _local_pose
+    _local_pose = msg
+    _pose_received.set()
 def _cb_imu(msg):   global _imu_data;      _imu_data      = msg
 
 
@@ -94,6 +115,10 @@ def get_altitude():
 def get_xyz():
     p = _local_pose.pose.position
     return p.x, p.y, p.z
+
+def get_yaw():
+    o = _local_pose.pose.orientation
+    return euler_from_quaternion([o.x, o.y, o.z, o.w])[2]
 
 def get_roll_pitch_yaw_deg():
     o = _imu_data.orientation
@@ -249,6 +274,20 @@ def param_pull(force=True, timeout=15.0):
         return False
 
 
+def param_get(name):
+    """讀取 FCU 參數（float 或 int），失敗回傳 None。"""
+    try:
+        rospy.wait_for_service('/mavros/param/get', timeout=5)
+        svc = rospy.ServiceProxy('/mavros/param/get', ParamGet)
+        res = svc(ParamGetRequest(param_id=name))
+        if not res.success:
+            return None
+        return res.value.real if res.value.integer == 0 else float(res.value.integer)
+    except (rospy.ServiceException, rospy.ROSException) as e:
+        rospy.logwarn(f"param_get({name}) failed: {e}")
+        return None
+
+
 def param_set(name, value, retries=5):
     try:
         rospy.wait_for_service('/mavros/param/set', timeout=5)
@@ -304,13 +343,22 @@ rospy.Subscriber('/mavros/imu/data',            Imu,         _cb_imu)
 sp_pub = rospy.Publisher(
     '/mavros/setpoint_raw/local', PositionTarget, queue_size=10)
 
-set_sp(make_target((0.0, 0.0, TARGET_ALT_M)))   # 初始 setpoint（Timer 啟動前先設定）
-_sp_timer = rospy.Timer(rospy.Duration(1.0 / CTRL_HZ), _timer_cb)
-
 rospy.loginfo("Waiting for MAVROS FCU connection...")
 while not rospy.is_shutdown() and not _vehicle_state.connected:
     rate.sleep()
 rospy.loginfo(f"  Connected. mode={_vehicle_state.mode}")
+
+rospy.loginfo("Waiting for local position...")
+while not rospy.is_shutdown() and not _pose_received.is_set():
+    rate.sleep()
+
+# 解鎖前 setpoint = 目前地面位置與航向（高度誤差 0），而不是 TARGET_ALT_M
+ground     = get_xyz()
+ground_yaw = get_yaw()
+set_sp(make_target(ground, yaw_rad=ground_yaw))   # 初始 setpoint（Timer 啟動前先設定）
+_sp_timer = rospy.Timer(rospy.Duration(1.0 / CTRL_HZ), _timer_cb)
+rospy.loginfo(f"  Ground position: ENU ({ground[0]:.2f}, {ground[1]:.2f}, {ground[2]:.2f}) m  "
+              f"yaw={math.degrees(ground_yaw):.1f}°")
 rospy.loginfo(f"  Plan: alt={TARGET_ALT_M}m  side={SQUARE_SIDE_M}m  "
               f"peak={SEG_PEAK_SPEED_MPS}m/s  {'CW' if CLOCKWISE else 'CCW'}  "
               f"{_SEG_DUR_S:.1f}s/side × 4 + {VERTEX_DWELL_S}s dwell × {NUM_LAPS} laps "
@@ -328,10 +376,22 @@ rospy.loginfo("  PFA_DES_ROLL  = 0° ... " +
 rospy.loginfo("  PFA_DES_PITCH = 0° ... " +
               ("OK" if param_set('PFA_DES_PITCH', 0.0) else "FAILED"))
 
+tkf_byp = param_get('PFA_TKF_BYP')
+spool_s = param_get('COM_SPOOLUP_TIME')
+ramp_s  = param_get('MPC_TKO_RAMP_T')
+if tkf_byp is not None and int(round(tkf_byp)) == 0:
+    rospy.logwarn("  WARNING: PFA_TKF_BYP = 0 → OFFBOARD 下收不到 want_takeoff，"
+                  "推力上限會卡在 0.1，請改回 1。")
+spool_s = 1.0 if spool_s is None else spool_s
+ramp_s  = 3.0 if ramp_s  is None else ramp_s
+TAKEOFF_WAIT_S = spool_s + ramp_s + TAKEOFF_SETTLE_S
+rospy.loginfo(f"  Takeoff ramp: COM_SPOOLUP_TIME={spool_s:.1f} s + MPC_TKO_RAMP_T={ramp_s:.1f} s "
+              f"→ wait {TAKEOFF_WAIT_S:.1f} s after arming before climbing")
+
 # ─────────────────────────────────────────────────────────────
 # Step 1 – Stream setpoints → OFFBOARD → Arm
 # ─────────────────────────────────────────────────────────────
-rospy.loginfo(f"\n[Step 1] Streaming setpoints (5 s, z={TARGET_ALT_M} m)...")
+rospy.loginfo(f"\n[Step 1] Streaming ground-position setpoints (5 s)...")
 # Timer 在背景發布，rospy.sleep() 讓主執行緒等待即可
 rospy.sleep(5.0)
 
@@ -357,9 +417,19 @@ while not rospy.is_shutdown() and not _vehicle_state.armed:
 rospy.loginfo("  Armed.")
 
 # ─────────────────────────────────────────────────────────────
-# Step 2 – Stable hover at TARGET_ALT_M
+# Step 2 – 平滑起飛：等 PX4 起飛緩升結束 → 最小 jerk 爬升（含前饋）→ 等待穩定
 # ─────────────────────────────────────────────────────────────
-rospy.loginfo(f"\n[Step 2] Stable hover at {TARGET_ALT_M} m...")
+rospy.loginfo(f"\n[Step 2a] Holding ground position for {TAKEOFF_WAIT_S:.1f} s (PX4 takeoff ramp)...")
+rospy.sleep(TAKEOFF_WAIT_S)
+
+climb_from = (ground[0], ground[1], get_altitude())     # 從目前高度開始
+climb_to   = (ground[0], ground[1], TARGET_ALT_M)
+T_climb    = line_duration(climb_from, climb_to, CLIMB_PEAK_MPS, min_dur=CLIMB_MIN_S)
+rospy.loginfo(f"\n[Step 2b] Smooth climb {climb_from[2]:.2f} m → {TARGET_ALT_M:.2f} m "
+              f"(peak ≤ {CLIMB_PEAK_MPS} m/s, feedforward: p + v + a)")
+run_trajectory(line_segment(climb_from, climb_to, T_climb, ground_yaw), T_climb, "climb")
+
+rospy.loginfo(f"\n[Step 2c] Stable hover at {TARGET_ALT_M} m...")
 rospy.loginfo(f"  Waiting (±{ALT_TOL} m for {HOVER_STABLE_TIME:.0f} s)...")
 stable_since = None
 last_log     = rospy.Time.now()
