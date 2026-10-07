@@ -1,51 +1,30 @@
 #!/usr/bin/env python3
 """
-PFA Figure-8 Path Tracking with Feedforward (MAVROS / ROS1 Noetic)
-===================================================================
-Task: 繞 8 字軌跡飛行，roll=pitch=0°，yaw 跟隨前進切線方向
-      pfa_fig8_mavros.py 的前饋版本：同時送出位置 + 速度 + 加速度
+Circle Trajectory with Feedforward (MAVROS / ROS 1)
+=====================================================
+光流室內版：繞直徑 1 m（半徑 0.5 m）圓形軌跡飛行，同時送出位置 + 速度 + 加速度前饋。
+circle_traj_mavros.py 的前饋版本。
 
 ■ 為什麼要前饋
-  pfa_fig8_mavros.py 只送位置（/mavros/setpoint_position/local），
-  trajectory_setpoint 的 velocity / acceleration 為 NaN → pfa_pos_control 的
-  _checkAllFinite() 把它們清成 0：
+  只送位置時 trajectory_setpoint.velocity/acceleration = NaN → pfa_pos_control
+  清成 0，D 項以 0 為速度參考一直煞車 → 固定落後 (Kv/Kp)·速度。
+  送出 v_ref、a_ref（含向心加速度）後誤差動態為 ë + Kv·ė + Kp·e = 0。
+  （前饋無法消除重心偏移等固定干擾造成的穩態誤差，那需要積分項。）
 
-      control_acc = a_ref + Kv·(v_ref − v) + Kp·(p_ref − p)
-                    = 0    + Kv·(0 − v)     + Kp·e
-
-  等速前進時 Kp·e = Kv·v → 固定落後 e = (Kv/Kp)·v
-  （exp_fig8_1007：Kp=25, Kv=20 → 0.8 s × 速度，實測沿前進方向誤差佔總誤差 68%）
-
-  本腳本改用 /mavros/setpoint_raw/local (PositionTarget)，送出解析微分的
-  v_ref = ṗ_d(t)、a_ref = p̈_d(t)，誤差動態變為 ë + Kv·ė + Kp·e = 0 → 收斂到 0。
-  注意：前饋無法消除固定干擾（重心偏移、推力偏差）造成的穩態誤差，
-        那需要 pfa_pos_control 的積分項。
-
-■ 軌跡 (ENU，以懸停位置為 8 字中心)
-  Lissajous 1:2 參數曲線，相位 θ(t)：
-    x = cx + A·sin θ                 A = FIG8_LONG_RADIUS
-    y = cy + B·sin 2θ                B = A/2
-    z = TARGET_ALT_M
-  θ(t)：角頻率 ω = 2π / PERIOD_S，前後各 RAMP_S 秒平滑加減速（smoothstep）
-        （起停時速度、加速度都連續，結束時回到中心且速度為 0）
-  解析微分（θ̇、θ̈ 由 θ(t) 給出）：
-    ẋ = A·cos θ·θ̇                    ẍ = −A·sin θ·θ̇² + A·cos θ·θ̈
-    ẏ = 2B·cos 2θ·θ̇                  ÿ = −4B·sin 2θ·θ̇² + 2B·cos 2θ·θ̈
-  yaw = atan2(2B·cos 2θ, A·cos θ)    （切線方向，與 θ̇ 大小無關，起停時不跳）
-
-■ 限制
-  pfa_pos_control 會把速度參考限制在 _speed_xy_max = 1.0 m/s
-  （pfa_pos_control.hpp）；中心交叉速度 A·ω·√2 超過時前饋會被截斷，啟動時會警告。
+■ 圓形軌跡（以懸停位置為中心，ENU）
+  起點 = 圓的東側 (cx+R, cy)
+  位置：x = cx + R·cos(dir·ωτ),  y = cy + R·sin(dir·ωτ)
+        dir = +1 逆時針 (CCW)、-1 順時針 (CW)，由 CLOCKWISE 切換（由上往下看）
+  τ(t)：時間扭曲，前後各 RAMP_S 秒平滑加減速（smoothstep，加速度也連續）（幾何路徑不變，起停速度為 0）
+  前饋：v = dp/dτ·τ̇，a = d²p/dτ²·τ̇² + dp/dτ·τ̈（等速段向心加速度 = v²/R）
+  yaw ：YAW_TRACK_PATH=True 時追蹤切線方向
 
 ■ 控制鏈
-  set_sp() 更新共享 PositionTarget
-    → rospy.Timer (CTRL_HZ, 背景執行緒)
-    → /mavros/setpoint_raw/local（MAVROS 轉 ENU→NED）
-    → SET_POSITION_TARGET_LOCAL_NED (position + velocity + acceleration + yaw)
-    → trajectory_setpoint → pfa_pos_control → pfa_att_control
+  set_sp() → rospy.Timer (CTRL_HZ) → /mavros/setpoint_raw/local (PositionTarget)
+  → SET_POSITION_TARGET_LOCAL_NED (p + v + a + yaw) → pfa_pos_control → pfa_att_control
 
 執行方式：
-  python3 pfa_fig8_ff_mavros.py  (ROS 環境已 source)
+  python3 circle_traj_ff_mavros.py
 """
 
 import sys
@@ -62,42 +41,60 @@ from mavros_msgs.srv import (
     CommandBool, CommandBoolRequest,
     SetMode,     SetModeRequest,
     ParamSet,    ParamSetRequest,
+    ParamPull,   ParamPullRequest,
 )
 
 # ─────────────────────────────────────────────────────────────
-# Configuration（預設與 exp_fig8_1007 實驗相同，方便比較有無前饋）
+# Configuration
 # ─────────────────────────────────────────────────────────────
-TARGET_ALT_M        = 1.0    # 飛行高度 (m，ENU z+)
-FIG8_LONG_RADIUS    = 1.0    # 8字長軸半徑 A (m); 短軸 B = A/2 自動計算
-PERIOD_S            = 20.0   # 一個完整 8 字的時間 (s，等速段)
-NUM_LAPS            = 2      # 飛行完整 8 字圈數
-RAMP_S              = 3.0    # 起始加速 / 結束減速時間 (s)
-YAW_TRACK_PATH      = True   # True: yaw 跟切線方向; False: 固定 yaw=0° (ENU East)
+TARGET_ALT_M      = 0.8    # 懸停高度 (m)，光流室內建議 0.5~1.0 m
+CIRCLE_DIAMETER_M = 1.0    # 圓直徑 (m)
+SPEED_MPS         = 0.3    # 切線速度 (m/s)
+RAMP_S            = 3.0    # 起始加速 / 結束減速時間 (s)
+NUM_LAPS          = 2      # 完整圓圈數
+CLOCKWISE         = False  # False: 逆時針 (CCW); True: 順時針 (CW)，由上往下看
+YAW_TRACK_PATH    = True   # True: yaw 追蹤前進方向; False: 固定 yaw=0°
 
-HOVER_PHASE_DUR     = 8.0    # 起飛後定高懸停時間 (s)
-ALT_TOL             = 0.15   # 穩定懸停高度容差 (m)
-HOVER_STABLE_TIME   = 3.0    # 穩定判定時間 (s)
-CTRL_HZ             = 20     # Timer 發布頻率（經 SiK 數傳時建議降到 10）
+HOVER_PHASE_DUR   = 5.0    # 起飛後穩定等待時間 (s)
+ALT_TOL           = 0.10   # 高度穩定容忍 (m)
+HOVER_STABLE_TIME = 3.0    # 連續穩定秒數
+APPROACH_PEAK_MPS = 0.3    # 移動到起點 / 返回中心的峰值速度 (m/s)
+YAW_SETTLE_S      = 2.0    # 起點停留，讓 yaw 轉到切線方向 (s)
 
-PX4_SPEED_XY_MAX    = 1.0    # pfa_pos_control 的 _speed_xy_max (m/s)，速度參考上限
-
-# ─────────────────────────────────────────────────────────────
-# Derived
-# ─────────────────────────────────────────────────────────────
-FIG8_SHORT_RADIUS = FIG8_LONG_RADIUS / 2.0       # B = A/2
-OMEGA             = 2.0 * math.pi / PERIOD_S     # rad/s
-THETA_END         = NUM_LAPS * 2.0 * math.pi
-TOTAL_DUR_S       = THETA_END / OMEGA + RAMP_S   # 含加減速的總時間
-
-# 中心交叉時速度最大：|v| = ω·sqrt(A² + (2B)²) = A·ω·√2 (B=A/2)
-V_CENTER_MPS = OMEGA * math.sqrt(FIG8_LONG_RADIUS**2 + (2 * FIG8_SHORT_RADIUS)**2)
-# 左右兩端 (x=±A) 速度與向心加速度：v = 2B·ω，a = 4B·ω²（ÿ 分量為 0，ẍ = −A·ω²）
-V_LOBE_MPS = 2.0 * FIG8_SHORT_RADIUS * OMEGA
-A_LOBE_MPS2 = FIG8_LONG_RADIUS * OMEGA ** 2
+CTRL_HZ           = 20     # Timer 發布頻率（經 SiK 數傳時建議降到 10）
+LOG_PERIOD_S      = 0.5    # 追蹤狀態印出間隔 (s)
+PX4_SPEED_XY_MAX  = 1.0    # pfa_pos_control 的 _speed_xy_max (m/s)，水平速度參考上限
+MIN_JERK_PEAK     = 1.875  # 最小 jerk 曲線：峰值速度 = 1.875 × L / T
 
 # PositionTarget.type_mask：位置、速度、加速度、yaw 都使用；只忽略 yaw_rate
 # （pfa_pos_control / pfa_att_control 目前不讀 trajectory_setpoint.yawspeed）
 TYPE_MASK_PVA_YAW = PositionTarget.IGNORE_YAW_RATE
+
+ZERO3 = (0.0, 0.0, 0.0)
+
+# Derived
+_R         = CIRCLE_DIAMETER_M / 2.0                       # 半徑 (m)
+_OMEGA     = SPEED_MPS / _R                                # 角速度 (rad/s)
+_DIR       = -1.0 if CLOCKWISE else 1.0
+_PATH_S    = NUM_LAPS * 2.0 * math.pi / _OMEGA             # 等速時繞完的時間 (s)
+_TOTAL_S   = _PATH_S + RAMP_S                              # 含加減速的總時間 (s)
+_LAP_DUR_S = 2.0 * math.pi / _OMEGA                        # 等速時每圈時間 (s)
+_ACC_C     = SPEED_MPS ** 2 / _R                           # 向心加速度 (m/s²)
+
+
+def circle_path(cx, cy):
+    """等速圓 path(τ) -> (p, dp/dτ, d²p/dτ², yaw)。"""
+    def path(tau):
+        ang  = _DIR * _OMEGA * tau
+        c, s = math.cos(ang), math.sin(ang)
+        w    = _DIR * _OMEGA
+        p    = (cx + _R * c, cy + _R * s, TARGET_ALT_M)
+        dp   = (-_R * s * w, _R * c * w, 0.0)
+        ddp  = (-_R * c * w * w, -_R * s * w * w, 0.0)
+        yaw  = (ang + _DIR * math.pi / 2.0) if YAW_TRACK_PATH else 0.0
+        return p, dp, ddp, yaw
+    return path
+
 
 # ─────────────────────────────────────────────────────────────
 # Global state
@@ -129,7 +126,7 @@ def get_roll_pitch_yaw_deg():
 # Setpoint helper
 # ─────────────────────────────────────────────────────────────
 
-def make_target(p, v=(0.0, 0.0, 0.0), a=(0.0, 0.0, 0.0), yaw_rad=0.0):
+def make_target(p, v=ZERO3, a=ZERO3, yaw_rad=0.0):
     """ENU PositionTarget：位置 + 速度 + 加速度 + yaw（全部為有限值）。
 
     三軸都必須是有限值：pfa_pos_control 的 _checkAllFinite() 只要任一分量
@@ -169,51 +166,141 @@ def _timer_cb(_event):
 
 
 # ─────────────────────────────────────────────────────────────
-# Figure-8 trajectory (analytic position / velocity / acceleration)
+# Trajectory building blocks（每段回傳 fn(t) -> (p, v, a, yaw)，ENU）
 # ─────────────────────────────────────────────────────────────
 
-def fig8_phase(t):
-    """回傳 (θ, θ̇, θ̈)：前後 RAMP_S 秒以 smoothstep 3u²−2u³ 平滑加減速，中段等角速度 ω。
-
-    θ̇ 與 θ̈ 都連續 → 速度與加速度前饋都沒有跳變；加減速段角度 = ω·RAMP_S/2。
-    """
+def min_jerk(t, T):
+    """最小 jerk 曲線 s(t)∈[0,1]：回傳 (s, ṡ, s̈)，起訖速度與加速度皆為 0。"""
     if t <= 0.0:
         return 0.0, 0.0, 0.0
-    if t >= TOTAL_DUR_S:
-        return THETA_END, 0.0, 0.0
-    if t < RAMP_S:
-        u = t / RAMP_S
-        return (OMEGA * RAMP_S * u**3 * (1.0 - 0.5 * u),
-                OMEGA * u * u * (3.0 - 2.0 * u),
-                OMEGA * 6.0 * u * (1.0 - u) / RAMP_S)
-    if t > TOTAL_DUR_S - RAMP_S:
-        r = (TOTAL_DUR_S - t) / RAMP_S
-        return (THETA_END - OMEGA * RAMP_S * r**3 * (1.0 - 0.5 * r),
-                OMEGA * r * r * (3.0 - 2.0 * r),
-                -OMEGA * 6.0 * r * (1.0 - r) / RAMP_S)
-    return 0.5 * OMEGA * RAMP_S + OMEGA * (t - RAMP_S), OMEGA, 0.0
+    if t >= T:
+        return 1.0, 0.0, 0.0
+    u = t / T
+    s   = u**3 * (10.0 - 15.0 * u + 6.0 * u * u)
+    sd  = 30.0 * u * u * (1.0 - u) ** 2 / T
+    sdd = 60.0 * u * (1.0 - u) * (1.0 - 2.0 * u) / (T * T)
+    return s, sd, sdd
 
 
-def fig8_state(cx, cy, t):
-    """t 秒時的 (p, v, a, yaw)，ENU，以 (cx, cy) 為中心。"""
-    A, B = FIG8_LONG_RADIUS, FIG8_SHORT_RADIUS
-    th, thd, thdd = fig8_phase(t)
-    s1, c1 = math.sin(th),       math.cos(th)
-    s2, c2 = math.sin(2.0 * th), math.cos(2.0 * th)
+def line_duration(p0, p1, peak_speed, min_dur=0.0):
+    """直線段時間：讓最小 jerk 曲線的峰值速度 = peak_speed（至少 min_dur）。"""
+    dist = math.dist(p0, p1)
+    return max(min_dur, MIN_JERK_PEAK * dist / peak_speed) if dist > 1e-6 else min_dur
 
-    p = (cx + A * s1, cy + B * s2, TARGET_ALT_M)
-    v = (A * c1 * thd, 2.0 * B * c2 * thd, 0.0)
-    a = (-A * s1 * thd * thd + A * c1 * thdd,
-         -4.0 * B * s2 * thd * thd + 2.0 * B * c2 * thdd,
-         0.0)
-    # 切線方向只取決於 dx/dθ、dy/dθ（θ̇ ≥ 0），起停時 yaw 不跳
-    yaw = math.atan2(2.0 * B * c2, A * c1) if YAW_TRACK_PATH else 0.0
-    return p, v, a, yaw
+
+def line_segment(p0, p1, T, yaw_rad):
+    """p0 → p1 的直線段（最小 jerk），yaw 固定。"""
+    d = tuple(b - a for a, b in zip(p0, p1))
+    def fn(t):
+        s, sd, sdd = min_jerk(t, T)
+        return (tuple(a + s * k for a, k in zip(p0, d)),
+                tuple(sd * k for k in d),
+                tuple(sdd * k for k in d),
+                yaw_rad)
+    return fn
+
+
+def ramp_time(t, path_dur, ramp):
+    """時間扭曲 τ(t)：τ̇ 在前後 ramp 秒內以 smoothstep 3u²−2u³ 平滑 0↔1，中段 τ̇ = 1。
+
+    回傳 (τ, τ̇, τ̈)；τ ∈ [0, path_dur]，總時間 = path_dur + ramp。
+    幾何路徑不變，只改變沿路徑的速度 → 速度與加速度前饋都連續、起停時為 0。
+    （加減速段的位移 = ramp/2，與線性加速相同，所以總時間不變。）
+    """
+    total = path_dur + ramp
+    if t <= 0.0:
+        return 0.0, 0.0, 0.0
+    if t >= total:
+        return path_dur, 0.0, 0.0
+    if t < ramp:
+        u = t / ramp
+        return ramp * u**3 * (1.0 - 0.5 * u), u * u * (3.0 - 2.0 * u), 6.0 * u * (1.0 - u) / ramp
+    if t > total - ramp:
+        r = (total - t) / ramp
+        return path_dur - ramp * r**3 * (1.0 - 0.5 * r), r * r * (3.0 - 2.0 * r), -6.0 * r * (1.0 - r) / ramp
+    return t - 0.5 * ramp, 1.0, 0.0
+
+
+def warped(path_fn, path_dur, ramp):
+    """把等速路徑 path_fn(τ) -> (p, dp/dτ, d²p/dτ², yaw) 套上 ramp_time 成為 fn(t)。"""
+    def fn(t):
+        tau, td, tdd = ramp_time(t, path_dur, ramp)
+        p, dp, ddp, yaw = path_fn(tau)
+        v = tuple(k * td for k in dp)
+        a = tuple(kk * td * td + k * tdd for k, kk in zip(dp, ddp))
+        return p, v, a, yaw
+    return fn
+
+
+def run_trajectory(fn, duration, title):
+    """以 fn(t) 送出 p/v/a/yaw 直到 duration，每 LOG_PERIOD_S 印出追蹤誤差。回傳終點狀態。"""
+    rospy.loginfo(f"  ── {title}  ({duration:.1f} s) ──")
+    t0       = rospy.Time.now()
+    last_log = t0
+    while not rospy.is_shutdown():
+        now = rospy.Time.now()
+        t   = min((now - t0).to_sec(), duration)
+        p, v, a, yaw = fn(t)
+        set_sp(make_target(p, v, a, yaw))
+
+        if (now - last_log).to_sec() >= LOG_PERIOD_S:
+            xn, yn, zn = get_xyz()
+            rospy.loginfo(f"    {t:5.1f}s  cmd=({p[0]:6.2f},{p[1]:6.2f},{p[2]:5.2f})  "
+                          f"pos=({xn:6.2f},{yn:6.2f},{zn:5.2f})  "
+                          f"err={math.hypot(p[0] - xn, p[1] - yn):4.2f}m  "
+                          f"|v_ff|={math.hypot(v[0], v[1]):4.2f}  |a_ff|={math.hypot(a[0], a[1]):4.2f}  "
+                          f"yaw={math.degrees(yaw):6.1f}°")
+            last_log = now
+        if t >= duration:
+            break
+        rate.sleep()
+    return fn(duration)
+
+
+def hold(p, yaw_rad, duration, title):
+    """在 p 以零速度/加速度前饋保持 duration 秒。"""
+    rospy.loginfo(f"  ── {title}  ({duration:.1f} s) ──")
+    set_sp(make_target(p, yaw_rad=yaw_rad))
+    t_end    = rospy.Time.now() + rospy.Duration(duration)
+    last_log = rospy.Time.now()
+    while not rospy.is_shutdown() and rospy.Time.now() < t_end:
+        now = rospy.Time.now()
+        if (now - last_log).to_sec() >= 2.0:
+            xn, yn, zn = get_xyz()
+            r_deg, p_deg, _ = get_roll_pitch_yaw_deg()
+            rospy.loginfo(f"    pos=({xn:.2f},{yn:.2f}) alt={zn:.2f}m  "
+                          f"err={math.hypot(p[0] - xn, p[1] - yn):.2f}m  "
+                          f"roll={r_deg:+.1f}°  pitch={p_deg:+.1f}°")
+            last_log = now
+        rate.sleep()
+
+
+def warn_speed(peak_xy_mps, what):
+    if peak_xy_mps > PX4_SPEED_XY_MAX:
+        rospy.logwarn(f"  WARNING: {what} peak horizontal speed {peak_xy_mps:.2f} m/s > "
+                      f"pfa_pos_control _speed_xy_max {PX4_SPEED_XY_MAX:.1f} m/s "
+                      f"→ velocity feedforward will be clipped. Slow down or shrink the path.")
 
 
 # ─────────────────────────────────────────────────────────────
 # MAVROS service wrappers
 # ─────────────────────────────────────────────────────────────
+
+def param_pull(force=True, timeout=15.0):
+    """Sync MAVROS parameter cache from FCU (prevents stale-cache param_set failures)."""
+    try:
+        rospy.wait_for_service('/mavros/param/pull', timeout=timeout)
+        svc = rospy.ServiceProxy('/mavros/param/pull', ParamPull)
+        res = svc(ParamPullRequest(force_pull=force))
+        if res.success:
+            rospy.loginfo(f"  param_pull: synced {res.param_received} parameters from FCU")
+        else:
+            rospy.logwarn("  param_pull: reported failure")
+        return res.success
+    except (rospy.ServiceException, rospy.ROSException) as e:
+        rospy.logwarn(f"  param_pull failed: {e}")
+        return False
+
 
 def param_set(name, value, retries=5):
     try:
@@ -223,8 +310,7 @@ def param_set(name, value, retries=5):
         req.param_id = name
         req.value    = ParamValue(integer=0, real=float(value))
         for _ in range(retries):
-            res = svc(req)
-            if res.success:
+            if svc(req).success:
                 return True
             rospy.sleep(0.3)
     except (rospy.ServiceException, rospy.ROSException) as e:
@@ -237,8 +323,7 @@ def set_mode(mode_str, retries=5):
         rospy.wait_for_service('/mavros/set_mode', timeout=5)
         svc = rospy.ServiceProxy('/mavros/set_mode', SetMode)
         for _ in range(retries):
-            res = svc(SetModeRequest(custom_mode=mode_str))
-            if res.mode_sent:
+            if svc(SetModeRequest(custom_mode=mode_str)).mode_sent:
                 return True
             rospy.sleep(0.3)
     except (rospy.ServiceException, rospy.ROSException) as e:
@@ -246,24 +331,23 @@ def set_mode(mode_str, retries=5):
     return False
 
 
-def arm_vehicle(do_arm=True, retries=5):
+def arm_vehicle(retries=5):
     try:
         rospy.wait_for_service('/mavros/cmd/arming', timeout=5)
         svc = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
         for _ in range(retries):
-            res = svc(CommandBoolRequest(value=do_arm))
-            if res.success:
+            if svc(CommandBoolRequest(value=True)).success:
                 return True
             rospy.sleep(0.3)
     except (rospy.ServiceException, rospy.ROSException) as e:
-        rospy.logwarn(f"arming({do_arm}) failed: {e}")
+        rospy.logwarn(f"arming failed: {e}")
     return False
 
 
 # ─────────────────────────────────────────────────────────────
 # ROS init
 # ─────────────────────────────────────────────────────────────
-rospy.init_node('pfa_fig8_ff', anonymous=False)
+rospy.init_node('circle_traj_ff', anonymous=False)
 rate = rospy.Rate(CTRL_HZ)
 
 rospy.Subscriber('/mavros/state',               State,       _cb_state)
@@ -280,20 +364,13 @@ rospy.loginfo("Waiting for MAVROS FCU connection...")
 while not rospy.is_shutdown() and not _vehicle_state.connected:
     rate.sleep()
 rospy.loginfo(f"  Connected. mode={_vehicle_state.mode}")
-rospy.loginfo(f"  Figure-8 (feedforward) mission plan:")
-rospy.loginfo(f"    Alt           : {TARGET_ALT_M:.1f} m (constant)")
-rospy.loginfo(f"    Long radius A : {FIG8_LONG_RADIUS:.2f} m   Short radius B: {FIG8_SHORT_RADIUS:.2f} m")
-rospy.loginfo(f"    Period        : {PERIOD_S:.0f} s/lap × {NUM_LAPS} laps "
-              f"(+{RAMP_S:.0f} s ramp) = {TOTAL_DUR_S:.0f} s")
-rospy.loginfo(f"    Speed         : center {V_CENTER_MPS:.2f} m/s, lobe tips {V_LOBE_MPS:.2f} m/s")
-rospy.loginfo(f"    Accel (tips)  : {A_LOBE_MPS2:.2f} m/s²")
-rospy.loginfo(f"    Feedforward   : position + velocity + acceleration (setpoint_raw/local)")
-rospy.loginfo(f"    Yaw mode      : "
-              f"{'追蹤切線方向' if YAW_TRACK_PATH else '固定 0° (ENU East)'}")
-if V_CENTER_MPS > PX4_SPEED_XY_MAX:
-    rospy.logwarn(f"  WARNING: peak speed {V_CENTER_MPS:.2f} m/s > pfa_pos_control _speed_xy_max "
-                  f"{PX4_SPEED_XY_MAX:.1f} m/s → velocity feedforward will be clipped. "
-                  f"Increase PERIOD_S or reduce FIG8_LONG_RADIUS.")
+rospy.loginfo(f"  Plan: alt={TARGET_ALT_M}m  diameter={CIRCLE_DIAMETER_M}m  "
+              f"speed={SPEED_MPS}m/s  {'CW' if CLOCKWISE else 'CCW'}  "
+              f"~{_LAP_DUR_S:.1f}s/lap × {NUM_LAPS} laps (+{RAMP_S:.0f}s ramp)  "
+              f"a_c={_ACC_C:.2f}m/s²  (feedforward: p + v + a)")
+warn_speed(SPEED_MPS, "circle")
+rospy.loginfo("  Syncing parameter cache from FCU...")
+param_pull()
 
 # ─────────────────────────────────────────────────────────────
 # Step 0 – PFA attitude parameters
@@ -314,7 +391,6 @@ rospy.sleep(5.0)
 # arm_vehicle()/set_mode() 阻塞時，Timer 仍在背景以 CTRL_HZ 發布
 rospy.loginfo("  Requesting OFFBOARD mode...")
 set_mode('OFFBOARD')
-
 t_wait = rospy.Time.now()
 while not rospy.is_shutdown() and _vehicle_state.mode != 'OFFBOARD':
     if (rospy.Time.now() - t_wait).to_sec() > 5.0:
@@ -325,7 +401,6 @@ rospy.loginfo(f"  Mode: {_vehicle_state.mode}")
 
 rospy.loginfo("  Arming...")
 arm_vehicle()
-
 t_wait = rospy.Time.now()
 while not rospy.is_shutdown() and not _vehicle_state.armed:
     if (rospy.Time.now() - t_wait).to_sec() > 10.0:
@@ -339,24 +414,18 @@ rospy.loginfo("  Armed.")
 # ─────────────────────────────────────────────────────────────
 rospy.loginfo(f"\n[Step 2] Stable hover at {TARGET_ALT_M} m...")
 rospy.loginfo(f"  Waiting (±{ALT_TOL} m for {HOVER_STABLE_TIME:.0f} s)...")
-
 stable_since = None
 last_log     = rospy.Time.now()
 t_phase      = rospy.Time.now()
-
 while not rospy.is_shutdown():
-    alt     = get_altitude()
-    alt_err = TARGET_ALT_M - alt
-    now     = rospy.Time.now()
-
+    now, alt = rospy.Time.now(), get_altitude()
+    alt_err  = TARGET_ALT_M - alt
     stable_since = (stable_since or now) if abs(alt_err) < ALT_TOL else None
-
     if (now - last_log).to_sec() > 1.0:
         s = (now - stable_since).to_sec() if stable_since else 0.0
         rospy.loginfo(f"  alt={alt:.2f} m (err={alt_err:+.2f})  "
                       f"stable={s:.1f}/{HOVER_STABLE_TIME:.0f} s")
         last_log = now
-
     if stable_since and (now - stable_since).to_sec() >= HOVER_STABLE_TIME:
         rospy.loginfo(f"  Stable at {alt:.2f} m.")
         break
@@ -366,84 +435,45 @@ while not rospy.is_shutdown():
     rate.sleep()
 
 # ─────────────────────────────────────────────────────────────
-# Step 3 – Level hover hold, record figure-8 center, turn to initial yaw
+# Step 3 – Hover hold, record path origin
 # ─────────────────────────────────────────────────────────────
-rospy.loginfo(f"\n[Step 3] Hover hold for {HOVER_PHASE_DUR:.0f} s (recording 8-center)...")
-t_end    = rospy.Time.now() + rospy.Duration(HOVER_PHASE_DUR)
-last_log = rospy.Time.now()
-while not rospy.is_shutdown() and rospy.Time.now() < t_end:
-    now = rospy.Time.now()
-    if (now - last_log).to_sec() > 2.0:
-        rospy.loginfo(f"  alt={get_altitude():.2f} m  "
-                      f"remaining={(t_end - now).to_sec():.1f} s")
-        last_log = now
-    rate.sleep()
-
+rospy.loginfo(f"\n[Step 3] Hover hold for {HOVER_PHASE_DUR:.0f} s (recording path origin)...")
+rospy.sleep(HOVER_PHASE_DUR)
 cx, cy, _ = get_xyz()
-rospy.loginfo(f"  Figure-8 center: ENU ({cx:.2f}, {cy:.2f}) m")
+rospy.loginfo(f"  Path origin: ENU ({cx:.2f}, {cy:.2f}) m")
 
-# 在中心先轉到起始切線方向，避免起步時 yaw 指令階躍
-p0, _, _, yaw0 = fig8_state(cx, cy, 0.0)
-YAW_SETTLE_S = 2.0
-rospy.loginfo(f"  Turning to initial yaw {math.degrees(yaw0):.1f}° ({YAW_SETTLE_S:.0f} s)...")
-set_sp(make_target(p0, yaw_rad=yaw0))
-rospy.sleep(YAW_SETTLE_S)
+path   = circle_path(cx, cy)
+centre = (cx, cy, TARGET_ALT_M)
+p0, _, _, yaw0 = path(0.0)
 
 # ─────────────────────────────────────────────────────────────
-# Step 4 – Figure-8 trajectory with velocity / acceleration feedforward
+# Step 4 – 由圓心移動至起點 (cx+R, cy)，並轉向起始切線方向
 # ─────────────────────────────────────────────────────────────
-rospy.loginfo(f"\n[Step 4] Figure-8 (FF): {NUM_LAPS} laps, {TOTAL_DUR_S:.0f} s total")
-rospy.loginfo(f"  {'Time':>6}  {'Lap':>4}  {'Xcmd':>7}  {'Ycmd':>7}  {'Xnow':>7}  {'Ynow':>7}  "
-              f"{'Err':>5}  {'|Vff|':>6}  {'|Aff|':>6}  {'Alt':>5}  {'YawCmd':>7}")
-rospy.loginfo("  " + "─" * 88)
-
-t_track  = rospy.Time.now()
-last_log = rospy.Time.now()
-
-while not rospy.is_shutdown():
-    now     = rospy.Time.now()
-    elapsed = (now - t_track).to_sec()
-
-    p, v, a, yaw_cmd = fig8_state(cx, cy, elapsed)
-    set_sp(make_target(p, v, a, yaw_rad=yaw_cmd))
-
-    if (now - last_log).to_sec() >= 0.5:
-        xn, yn, _ = get_xyz()
-        th, _, _  = fig8_phase(elapsed)
-        err       = math.hypot(p[0] - xn, p[1] - yn)
-        rospy.loginfo(f"  {elapsed:6.1f}s  {th / (2.0 * math.pi):4.2f}  {p[0]:7.2f}m  {p[1]:7.2f}m  "
-                      f"{xn:7.2f}m  {yn:7.2f}m  {err:5.2f}  "
-                      f"{math.hypot(v[0], v[1]):5.2f}   {math.hypot(a[0], a[1]):5.2f}   "
-                      f"{get_altitude():5.2f}m  {math.degrees(yaw_cmd):6.1f}°")
-        last_log = now
-
-    if elapsed >= TOTAL_DUR_S:
-        break
-    rate.sleep()
-
-rospy.loginfo("\n  Figure-8 complete.")
+rospy.loginfo(f"\n[Step 4] Approach start point ({p0[0]:.2f},{p0[1]:.2f}), yaw→{math.degrees(yaw0):.0f}°")
+T_app = line_duration(centre, p0, APPROACH_PEAK_MPS, min_dur=3.0)
+run_trajectory(line_segment(centre, p0, T_app, yaw0), T_app, "centre → start")
+hold(p0, yaw0, YAW_SETTLE_S, "start point, yaw settle")
 
 # ─────────────────────────────────────────────────────────────
-# Step 5 – Hold at center
+# Step 5 – 圓形軌跡
 # ─────────────────────────────────────────────────────────────
-rospy.loginfo(f"\n[Step 5] Holding at center ({cx:.2f}, {cy:.2f}) m for 5 s...")
-set_sp(make_target((cx, cy, TARGET_ALT_M), yaw_rad=fig8_state(cx, cy, TOTAL_DUR_S)[3]))
-t_end    = rospy.Time.now() + rospy.Duration(5.0)
-last_log = rospy.Time.now()
-while not rospy.is_shutdown() and rospy.Time.now() < t_end:
-    now = rospy.Time.now()
-    if (now - last_log).to_sec() > 1.0:
-        xn, yn, _ = get_xyz()
-        r_deg, p_deg, _ = get_roll_pitch_yaw_deg()
-        rospy.loginfo(f"  pos=({xn:.2f}, {yn:.2f})  alt={get_altitude():.2f} m  "
-                      f"roll={r_deg:.1f}°  pitch={p_deg:.1f}°")
-        last_log = now
-    rate.sleep()
+rospy.loginfo(f"\n[Step 5] Circle trajectory ({NUM_LAPS} lap(s), "
+              f"{'CW' if CLOCKWISE else 'CCW'})  ~{_TOTAL_S:.0f} s total")
+p_end, _, _, yaw_end = run_trajectory(warped(path, _PATH_S, RAMP_S), _TOTAL_S, "circle")
+rospy.loginfo(f"\n  ✓ Circle trajectory complete ({NUM_LAPS} lap(s)).")
 
 # ─────────────────────────────────────────────────────────────
-# Step 6 – Land
+# Step 6 – 返回中心懸停 5 s
 # ─────────────────────────────────────────────────────────────
-rospy.loginfo("\n[Step 6] Landing (AUTO.LAND)...")
+rospy.loginfo(f"\n[Step 6] Return to centre ({cx:.2f}, {cy:.2f}) m...")
+T_ret = line_duration(p_end, centre, APPROACH_PEAK_MPS, min_dur=3.0)
+run_trajectory(line_segment(p_end, centre, T_ret, yaw_end), T_ret, "end → centre")
+hold(centre, yaw_end, 5.0, "centre hold")
+
+# ─────────────────────────────────────────────────────────────
+# Land
+# ─────────────────────────────────────────────────────────────
+rospy.loginfo("\n[Land] Landing (AUTO.LAND)...")
 set_mode('AUTO.LAND')
 # 確認已離開 OFFBOARD 才停止 Timer，否則會先觸發 offboard lost → Position mode
 t0 = rospy.Time.now()
