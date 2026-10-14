@@ -3,7 +3,7 @@
 PFA Roll + Pitch Cone (Coning) Tracking (MAVROS / ROS 1)
 =========================================================
 pfa_rollpitch_sine_mavros.py 的 90° 相位版本：原地懸停，roll 與 pitch 以相差 90°
-的正弦波擺動（預設 ±20°），機身傾斜方向繞圈（錐形擺動），位置維持不動。
+的正弦波擺動（預設 ±15°），機身傾斜方向繞圈（錐形擺動），位置維持不動。
 
 ■ 姿態指令怎麼送進 PX4
   pfa_pos_control 的期望 roll / pitch 只來自參數 PFA_DES_ROLL / PFA_DES_PITCH
@@ -17,11 +17,11 @@ pfa_rollpitch_sine_mavros.py 的 90° 相位版本：原地懸停，roll 與 pit
   完整週期 e = 1，最後 ENV_RAMP_S 再 1 → 0。避免一開始角速度就跳到 A·ω。
   本版固定 PITCH_PHASE_DEG = ±90° → 錐形擺動（coning）：
     θ_roll = A·sin(ωt)、θ_pitch = ±A·cos(ωt)，一軸最大時另一軸為 0，
-    機頂傾斜方向以週期 SINE_PERIOD_S 繞圈，合成傾角大致維持 A（±20° → 約 20°），
+    機頂傾斜方向以週期 SINE_PERIOD_S 繞圈，合成傾角大致維持 A，
     機身頂部畫出一個圓錐；yaw 不變（機頭方向固定）。
     CONE_CCW = True  → 俯視逆時針（機頂依序傾向 後 → 右 → 前 → 左）
     CONE_CCW = False → 俯視順時針（後 → 左 → 前 → 右）
-  與同相版（PITCH_PHASE_DEG = 0）相比，合成傾角沒有 28° 的尖峰，但每一刻都維持
+  與同相版（PITCH_PHASE_DEG = 0）相比，合成傾角沒有 √2 倍的尖峰，但每一刻都維持
   約 A 的傾角，舵機持續處於大偏轉；結束時會額外統計實際合成傾角。
 
 ■ PARAM_SET 的限制
@@ -29,6 +29,18 @@ pfa_rollpitch_sine_mavros.py 的 90° 相位版本：原地懸停，roll 與 pit
   兩個參數一輪可能就要 0.2–0.6 s。指令值以實際時間計算，所以送得慢只會讓
   正弦波取樣變粗、不會讓時間軸漂移；結束時會印出實際更新率。
   每次改參數 PX4 會觸發 parameter_update 並自動存檔，請不要把 PARAM_HZ 調得太高。
+
+■ 韌體每秒只讀一次參數（重要）
+  pfa_pos_control 的 _parameter_update_sub 是 SubscriptionInterval 1 s，PFA_DES_ROLL/PITCH
+  每秒最多生效一次，所以 PARAM_HZ 預設 = 1：送更快不會更平滑，只會多觸發參數存檔
+  （log 會出現 "parameter export to /fs/microsd/params failed"）。1 Hz 階梯的每步大小
+  約 A·ω·1 s，預設 ±15°、週期 20 s 時約 4.7°。
+
+■ 位置優先保護（GUARD_*）
+  pfa_pos_control 逐軸限幅、沒有「先保垂直推力」：傾角接近舵機極限時，位置一漂，
+  Kp·e 要求的水平力會把機身 z 推力擠到 0 而失高度（exp_pitch_20：pitch 25° 墜落）。
+  腳本每拍檢查實測傾角、舵機角度（pymavlink 版）、水平與高度誤差，超標就把指令乘上
+  g（g ← 0.7·g）讓出姿態、先保位置；條件都有餘裕時 g 再慢慢回到 1。
 
 ■ 安全
   - 期間若離開 OFFBOARD 或被上鎖，立即中止並把 PFA_DES_ROLL/PITCH 設回 0
@@ -75,17 +87,27 @@ from mavros_msgs.srv import (
 # ─────────────────────────────────────────────────────────────
 TARGET_ALT_M      = 1.0    # 懸停高度 (m)；光流 SENS_FLOW_MINHGT = 0.8 m，建議 ≥ 1.0
 
-ROLL_AMP_DEG      = 20.0   # roll 振幅 (deg)，正值 = 右翼朝下
-PITCH_AMP_DEG     = 20.0   # pitch 振幅 (deg)，正值 = 機頭朝上
-SINE_PERIOD_S     = 10.0   # 正弦週期 (s)；峰值角速度 = 2π·A/T（20°, 10 s → 12.6°/s）
+ROLL_AMP_DEG      = 15.0   # roll 振幅 (deg)，正值 = 右翼朝下
+PITCH_AMP_DEG     = 15.0   # pitch 振幅 (deg)，正值 = 機頭朝上
+SINE_PERIOD_S     = 20.0   # 正弦週期 (s)；峰值角速度 = 2π·A/T（15°, 20 s → 4.7°/s）
 CONE_CCW          = True   # True: 俯視逆時針（後→右→前→左）; False: 順時針
 PITCH_PHASE_DEG   = 90.0 if CONE_CCW else -90.0   # pitch 相對 roll 的相位 (deg)
-NUM_CYCLES        = 3      # 滿振幅的完整週期數
+NUM_CYCLES        = 2      # 滿振幅的完整週期數
 ENV_RAMP_S        = SINE_PERIOD_S   # 振幅包絡淡入 / 淡出時間 (s)
-MAX_AMP_DEG       = 30.0   # 振幅硬上限 (deg)
+MAX_AMP_DEG       = 18.0   # 振幅硬上限 (deg)；20° 起舵機就接近飽和（exp_pitch_20）
 
-PARAM_HZ          = 5.0    # PFA_DES_ROLL/PITCH 更新頻率 (Hz)
+PARAM_HZ          = 1.0    # PFA_DES_ROLL/PITCH 更新頻率 (Hz)；韌體每秒只讀一次參數
 PARAM_DEADBAND_DEG = 0.2   # 與上次送出值差異小於此值就不送
+
+# 位置優先保護：接近舵機 / 推力極限時縮小姿態指令，先保住位置與高度、不硬追姿態
+# 指令 = g × A·e(t)·sin(…)，g ∈ [0, 1]；任一條件超標時 g ← g × GUARD_BACKOFF，
+# 全部條件都有餘裕時 g 每秒回升 GUARD_RECOVER_PER_S
+GUARD_TILT_DEG      = 20.0   # 實測 |roll| 或 |pitch| 超過就縮小指令
+GUARD_SERVO_DEG     = 20.0   # 舵機偏轉超過就縮小指令（舵機極限 ±30°，留 10° 給位置修正）
+GUARD_XY_ERR_M      = 0.10   # 水平位置誤差上限 (m)
+GUARD_ALT_ERR_M     = 0.15   # 高度誤差上限 (m)
+GUARD_BACKOFF       = 0.7    # 超標時每拍乘上的係數
+GUARD_RECOVER_PER_S = 0.1    # 有餘裕時 g 每秒回升量
 
 HOVER_BEFORE_S    = 5.0    # 開始擺動前的懸停時間 (s)
 HOVER_AFTER_S     = 5.0    # 擺動結束、姿態歸零後的懸停時間 (s)
@@ -199,6 +221,24 @@ def envelope(t):
     if t < ENV_RAMP_S + _FULL_S:
         return 1.0
     return 1.0 - min_jerk(t - ENV_RAMP_S - _FULL_S, ENV_RAMP_S)[0]
+
+def guard_update(g, roll_m, pitch_m, xy_e, alt_e, servo_deg, dt):
+    """位置優先保護：回傳 (新的 g, 超標原因)。"""
+    reasons = []
+    if max(abs(roll_m), abs(pitch_m)) > GUARD_TILT_DEG:
+        reasons.append(f"tilt {max(abs(roll_m), abs(pitch_m)):.0f}°")
+    if servo_deg is not None and servo_deg > GUARD_SERVO_DEG:
+        reasons.append(f"servo {servo_deg:.0f}°")
+    if xy_e > GUARD_XY_ERR_M:
+        reasons.append(f"xy {xy_e:.2f} m")
+    if abs(alt_e) > GUARD_ALT_ERR_M:
+        reasons.append(f"alt {alt_e:+.2f} m")
+    if reasons:
+        return g * GUARD_BACKOFF, reasons
+    roomy = (max(abs(roll_m), abs(pitch_m)) < GUARD_TILT_DEG - 3.0
+             and (servo_deg is None or servo_deg < GUARD_SERVO_DEG - 3.0)
+             and xy_e < 0.5 * GUARD_XY_ERR_M and abs(alt_e) < 0.5 * GUARD_ALT_ERR_M)
+    return (min(1.0, g + GUARD_RECOVER_PER_S * dt) if roomy else g), []
 
 def attitude_cmd_deg(t):
     """t 秒時的 (roll, pitch) 指令 (deg，PX4 慣例)。"""
@@ -433,7 +473,7 @@ rospy.sleep(HOVER_BEFORE_S)
 # Step 4: roll + pitch 正弦追蹤（PARAM_SET @ PARAM_HZ）
 # ─────────────────────────────────────────────────────────────
 rospy.loginfo(f"\n[Step 4] Roll/pitch sine tracking for {_TOTAL_S:.0f} s")
-rospy.loginfo(f"  {'t':>5}  {'env':>4}  {'roll_cmd':>8} {'roll':>6}  {'pitch_cmd':>9} {'pitch':>6}  "
+rospy.loginfo(f"  {'t':>5}  {'env':>4}  {'g':>4}  {'roll_cmd':>8} {'roll':>6}  {'pitch_cmd':>9} {'pitch':>6}  "
               f"{'alt':>5}  {'xy_err':>6}")
 
 sent       = {'PFA_DES_ROLL': 0.0, 'PFA_DES_PITCH': 0.0}   # FCU 目前的值（已確認）
@@ -443,6 +483,9 @@ err_r, err_p, err_xy = [], [], []
 tilt_cmd, tilt_meas = [], []   # 合成傾角 (deg)
 aborted    = False
 param_dt   = 1.0 / PARAM_HZ
+g_safe     = 1.0         # 位置優先保護係數
+g_min      = 1.0
+n_guard    = 0
 
 try:
     t0       = rospy.Time.now()
@@ -458,8 +501,18 @@ try:
             aborted = True
             break
 
+        # 位置優先保護：先看實測狀態，超標就縮小指令（MAVROS 版沒有舵機回授，以實測傾角近似）
+        roll_m, pitch_m = get_roll_pitch_px4_deg()
+        xn, yn, zn      = get_xyz()
+        xy_e            = math.hypot(hover_p[0] - xn, hover_p[1] - yn)
+        g_safe, why = guard_update(g_safe, roll_m, pitch_m, xy_e, TARGET_ALT_M - zn, None, param_dt)
+        if why:
+            n_guard += 1
+            rospy.logwarn(f"  [guard] {', '.join(why)} → g = {g_safe:.2f}（讓出姿態、位置優先）")
+        g_min = min(g_min, g_safe)
+
         # 以實際時間計算指令；PARAM_SET 慢時只會取樣變粗，不會漂移
-        roll_c, pitch_c = attitude_cmd_deg(t)
+        roll_c, pitch_c = (g_safe * v for v in attitude_cmd_deg(t))
         for name, val in (('PFA_DES_ROLL', roll_c), ('PFA_DES_PITCH', pitch_c)):
             if abs(val - sent[name]) >= PARAM_DEADBAND_DEG:
                 if param_set(name, round(val, 2)):
@@ -469,9 +522,6 @@ try:
                     n_fail += 1
 
         # 追蹤誤差：與 FCU 目前的參數值比較（不含 PARAM_SET 延遲以外的取樣誤差）
-        roll_m, pitch_m = get_roll_pitch_px4_deg()
-        xn, yn, zn      = get_xyz()
-        xy_e            = math.hypot(hover_p[0] - xn, hover_p[1] - yn)
         if ENV_RAMP_S <= t < ENV_RAMP_S + _FULL_S:
             err_r.append(sent['PFA_DES_ROLL'] - roll_m)
             err_p.append(sent['PFA_DES_PITCH'] - pitch_m)
@@ -481,7 +531,7 @@ try:
 
         now = rospy.Time.now()
         if (now - last_log).to_sec() >= LOG_PERIOD_S:
-            rospy.loginfo(f"  {t:5.1f}  {envelope(t):4.2f}  {sent['PFA_DES_ROLL']:+8.1f} {roll_m:+6.1f}  "
+            rospy.loginfo(f"  {t:5.1f}  {envelope(t):4.2f}  {g_safe:4.2f}  {sent['PFA_DES_ROLL']:+8.1f} {roll_m:+6.1f}  "
                           f"{sent['PFA_DES_PITCH']:+9.1f} {pitch_m:+6.1f}  {zn:5.2f}  {xy_e:6.2f}")
             last_log = now
 
@@ -498,6 +548,7 @@ finally:
 
 rospy.loginfo(f"\n  PARAM_SET: {n_updates} updates in {elapsed:.1f} s "
               f"(≈ {n_updates / max(elapsed, 1e-3) / 2:.1f} Hz per axis), {n_fail} failed")
+rospy.loginfo(f"  Guard: triggered {n_guard} times, min g = {g_min:.2f}")
 
 def _rms(x): return math.sqrt(sum(v * v for v in x) / len(x)) if x else float('nan')
 if err_r:

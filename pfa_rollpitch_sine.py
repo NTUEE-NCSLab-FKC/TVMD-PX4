@@ -34,9 +34,21 @@ pfa_rollpitch_sine_mavros.py 的 pymavlink 版本：原地懸停，roll 與 pitc
 
 ■ 數傳頻寬（57600 baud，MAV_0_RATE ≈ 1200 B/s）
   每拍兩個 PARAM_SET（約 2×35 B 上行）與兩個 PARAM_VALUE（約 2×37 B 下行），
-  PARAM_HZ = 5 時下行約 370 B/s，加上 ATTITUDE 10 Hz、LOCAL_POSITION_NED 5 Hz
+  PARAM_HZ = 1 時下行約 75 B/s（5 Hz 也只約 370 B/s），加上 ATTITUDE 10 Hz、LOCAL_POSITION_NED 5 Hz
   仍在預算內；不要把 PARAM_HZ 拉太高。每次改參數 PX4 也會觸發 parameter_update
   與自動存檔。
+
+■ 韌體每秒只讀一次參數（重要）
+  pfa_pos_control 的 _parameter_update_sub 是 SubscriptionInterval 1 s，PFA_DES_ROLL/PITCH
+  每秒最多生效一次，所以 PARAM_HZ 預設 = 1：送更快不會更平滑，只會多觸發參數存檔
+  （log 會出現 "parameter export to /fs/microsd/params failed"）。1 Hz 階梯的每步大小
+  約 A·ω·1 s，預設 ±15°、週期 20 s 時約 4.7°。
+
+■ 位置優先保護（GUARD_*）
+  pfa_pos_control 逐軸限幅、沒有「先保垂直推力」：傾角接近舵機極限時，位置一漂，
+  Kp·e 要求的水平力會把機身 z 推力擠到 0 而失高度（exp_pitch_20：pitch 25° 墜落）。
+  腳本每拍檢查實測傾角、舵機角度（pymavlink 版）、水平與高度誤差，超標就把指令乘上
+  g（g ← 0.7·g）讓出姿態、先保位置；條件都有餘裕時 g 再慢慢回到 1。
 
 ■ 安全
   - 期間若離開 OFFBOARD 或被上鎖，立即中止並把 PFA_DES_ROLL/PITCH 設回 0
@@ -67,16 +79,26 @@ CONNECTION        = 'udp:127.0.0.1:14550'
 
 TARGET_ALT_M      = 1.0    # 懸停高度 (m)；光流 SENS_FLOW_MINHGT = 0.8 m，建議 ≥ 1.0
 
-ROLL_AMP_DEG      = 20.0   # roll 振幅 (deg)，正值 = 右翼朝下
-PITCH_AMP_DEG     = 20.0   # pitch 振幅 (deg)，正值 = 機頭朝上
-SINE_PERIOD_S     = 10.0   # 正弦週期 (s)；峰值角速度 = 2π·A/T（20°, 10 s → 12.6°/s）
+ROLL_AMP_DEG      = 15.0   # roll 振幅 (deg)，正值 = 右翼朝下
+PITCH_AMP_DEG     = 15.0   # pitch 振幅 (deg)，正值 = 機頭朝上
+SINE_PERIOD_S     = 20.0   # 正弦週期 (s)；峰值角速度 = 2π·A/T（15°, 20 s → 4.7°/s）
 PITCH_PHASE_DEG   = 0.0    # pitch 相對 roll 的相位 (deg)；0 = 同相，90 = 錐形擺動
-NUM_CYCLES        = 3      # 滿振幅的完整週期數
+NUM_CYCLES        = 2      # 滿振幅的完整週期數
 ENV_RAMP_S        = SINE_PERIOD_S   # 振幅包絡淡入 / 淡出時間 (s)
-MAX_AMP_DEG       = 30.0   # 振幅硬上限 (deg)
+MAX_AMP_DEG       = 18.0   # 振幅硬上限 (deg)；20° 起舵機就接近飽和（exp_pitch_20）
 
-PARAM_HZ          = 5.0    # PFA_DES_ROLL/PITCH 更新頻率 (Hz)
+PARAM_HZ          = 1.0    # PFA_DES_ROLL/PITCH 更新頻率 (Hz)；韌體每秒只讀一次參數
 PARAM_DEADBAND_DEG = 0.2   # 與上次送出值差異小於此值就不送
+
+# 位置優先保護：接近舵機 / 推力極限時縮小姿態指令，先保住位置與高度、不硬追姿態
+# 指令 = g × A·e(t)·sin(…)，g ∈ [0, 1]；任一條件超標時 g ← g × GUARD_BACKOFF，
+# 全部條件都有餘裕時 g 每秒回升 GUARD_RECOVER_PER_S
+GUARD_TILT_DEG      = 20.0   # 實測 |roll| 或 |pitch| 超過就縮小指令
+GUARD_SERVO_DEG     = 20.0   # 舵機偏轉超過就縮小指令（舵機極限 ±30°，留 10° 給位置修正）
+GUARD_XY_ERR_M      = 0.10   # 水平位置誤差上限 (m)
+GUARD_ALT_ERR_M     = 0.15   # 高度誤差上限 (m)
+GUARD_BACKOFF       = 0.7    # 超標時每拍乘上的係數
+GUARD_RECOVER_PER_S = 0.1    # 有餘裕時 g 每秒回升量
 
 HOVER_BEFORE_S    = 5.0    # 開始擺動前的懸停時間 (s)
 HOVER_AFTER_S     = 5.0    # 擺動結束、姿態歸零後的懸停時間 (s)
@@ -415,6 +437,24 @@ def envelope(t: float) -> float:
     return 1.0 - min_jerk(t - ENV_RAMP_S - _FULL_S, ENV_RAMP_S)[0]
 
 
+def guard_update(g, roll_m, pitch_m, xy_e, alt_e, servo_deg, dt):
+    """位置優先保護：回傳 (新的 g, 超標原因)。"""
+    reasons = []
+    if max(abs(roll_m), abs(pitch_m)) > GUARD_TILT_DEG:
+        reasons.append(f"tilt {max(abs(roll_m), abs(pitch_m)):.0f}°")
+    if servo_deg is not None and servo_deg > GUARD_SERVO_DEG:
+        reasons.append(f"servo {servo_deg:.0f}°")
+    if xy_e > GUARD_XY_ERR_M:
+        reasons.append(f"xy {xy_e:.2f} m")
+    if abs(alt_e) > GUARD_ALT_ERR_M:
+        reasons.append(f"alt {alt_e:+.2f} m")
+    if reasons:
+        return g * GUARD_BACKOFF, reasons
+    roomy = (max(abs(roll_m), abs(pitch_m)) < GUARD_TILT_DEG - 3.0
+             and (servo_deg is None or servo_deg < GUARD_SERVO_DEG - 3.0)
+             and xy_e < 0.5 * GUARD_XY_ERR_M and abs(alt_e) < 0.5 * GUARD_ALT_ERR_M)
+    return (min(1.0, g + GUARD_RECOVER_PER_S * dt) if roomy else g), []
+
 def attitude_cmd_deg(t: float):
     """t 秒時的 (roll, pitch) 指令 (deg，PX4 慣例)。"""
     e = envelope(t)
@@ -541,7 +581,7 @@ time.sleep(HOVER_BEFORE_S)
 # Step 5 – roll + pitch 正弦追蹤（PARAM_SET @ PARAM_HZ，不等 ACK）
 # ─────────────────────────────────────────────────────────────
 print(f"\n[Step 5] Roll/pitch sine tracking for {_TOTAL_S:.0f} s")
-print(f"  {'t':>5}  {'env':>4}  {'roll_cmd':>8} {'fcu':>6} {'roll':>6}  "
+print(f"  {'t':>5}  {'env':>4}  {'g':>4}  {'roll_cmd':>8} {'fcu':>6} {'roll':>6}  "
       f"{'pitch_cmd':>9} {'fcu':>6} {'pitch':>6}  {'alt':>5}  {'xy_err':>6}  {'servo':>5}")
 
 last_sent  = {'PFA_DES_ROLL': 0.0, 'PFA_DES_PITCH': 0.0}
@@ -549,6 +589,9 @@ n_sent     = 0
 err_r, err_p, err_xy = [], [], []
 aborted    = False
 param_dt   = 1.0 / PARAM_HZ
+g_safe     = 1.0         # 位置優先保護係數
+g_min      = 1.0
+n_guard    = 0
 elapsed    = 0.0
 with _param_cv:
     for k in _param_acks:
@@ -569,8 +612,19 @@ try:
             aborted = True
             break
 
+        # 位置優先保護：先看實測狀態（含舵機角度），超標就縮小指令
+        roll_m  = math.degrees(_att['roll'])
+        pitch_m = math.degrees(_att['pitch'])
+        xy_e    = math.hypot(hover_p[0] - _ned['x'], hover_p[1] - _ned['y'])
+        g_safe, why = guard_update(g_safe, roll_m, pitch_m, xy_e, _ned['z'] - hover_p[2],
+                                   servo_max_deg(), param_dt)
+        if why:
+            n_guard += 1
+            print(f"\n  [guard] {', '.join(why)} → g = {g_safe:.2f}（讓出姿態、位置優先）", flush=True)
+        g_min = min(g_min, g_safe)
+
         # 以實際時間計算指令；不等 ACK，掉包時下一拍會送新值
-        roll_c, pitch_c = attitude_cmd_deg(t)
+        roll_c, pitch_c = (g_safe * v for v in attitude_cmd_deg(t))
         for name, val in (('PFA_DES_ROLL', roll_c), ('PFA_DES_PITCH', pitch_c)):
             val = round(val, 2)
             if abs(val - last_sent[name]) >= PARAM_DEADBAND_DEG:
@@ -581,9 +635,6 @@ try:
         # 追蹤誤差：與 FCU 回報的參數值比較（ATTITUDE 為 NED/FRD，與 PX4 同號）
         fcu_r   = fcu_param('PFA_DES_ROLL', 0.0)
         fcu_p   = fcu_param('PFA_DES_PITCH', 0.0)
-        roll_m  = math.degrees(_att['roll'])
-        pitch_m = math.degrees(_att['pitch'])
-        xy_e    = math.hypot(hover_p[0] - _ned['x'], hover_p[1] - _ned['y'])
         if ENV_RAMP_S <= t < ENV_RAMP_S + _FULL_S:
             err_r.append(fcu_r - roll_m)
             err_p.append(fcu_p - pitch_m)
@@ -593,7 +644,7 @@ try:
         if now - last_print >= LOG_PERIOD_S:
             sv = servo_max_deg()
             sv_s = f"{sv:4.1f}°" if sv is not None else "  n/a"
-            print(f"  {t:5.1f}  {envelope(t):4.2f}  {roll_c:+8.1f} {fcu_r:+6.1f} {roll_m:+6.1f}  "
+            print(f"  {t:5.1f}  {envelope(t):4.2f}  {g_safe:4.2f}  {roll_c:+8.1f} {fcu_r:+6.1f} {roll_m:+6.1f}  "
                   f"{pitch_c:+9.1f} {fcu_p:+6.1f} {pitch_m:+6.1f}  {-_ned['z']:5.2f}  "
                   f"{xy_e:6.2f}  {sv_s}")
             last_print = now
@@ -614,6 +665,7 @@ with _param_cv:
 print(f"\n  PARAM_SET: {n_sent} sent in {elapsed:.1f} s "
       f"(≈ {n_sent / max(elapsed, 1e-3) / 2:.1f} Hz per axis), "
       f"PARAM_VALUE received: roll {acks['PFA_DES_ROLL']}, pitch {acks['PFA_DES_PITCH']}")
+print(f"  Guard: triggered {n_guard} times, min g = {g_min:.2f}")
 
 
 def _rms(x):
