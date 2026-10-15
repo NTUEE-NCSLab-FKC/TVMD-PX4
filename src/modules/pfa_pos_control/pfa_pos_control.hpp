@@ -148,6 +148,9 @@ private:
 	manual_control_setpoint_s _manual_control_setpoint{};
 	vehicle_control_mode_s _vcontrol_mode{};
 
+	float _manual_desired_yaw{0.0f};
+	bool  _manual_yaw_initialized{false};
+
 	perf_counter_t	_loop_perf;
 
 	DEFINE_PARAMETERS(
@@ -158,8 +161,8 @@ private:
 		(ParamFloat<px4::params::PFA_GAIN_Y_D>) _param_pose_gain_d_y,
 		(ParamFloat<px4::params::PFA_GAIN_Z_D>) _param_pose_gain_d_z,
 
-		(ParamFloat<px4::params::PFA_DES_ROLL>)  _param_des_roll,   /**< desired roll  (deg) for attitude target */
-		(ParamFloat<px4::params::PFA_DES_PITCH>) _param_des_pitch,  /**< desired pitch (deg) for attitude target */
+		(ParamFloat<px4::params::PFA_DES_ROLL>)  _param_des_roll,
+		(ParamFloat<px4::params::PFA_DES_PITCH>) _param_des_pitch,
 
 		(ParamInt<px4::params::PFA_TKF_BYP>)    _param_takeoff_bypass,
 

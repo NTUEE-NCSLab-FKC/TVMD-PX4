@@ -332,15 +332,36 @@ void PFAPOSControl::Run()
 			const float current_yaw = euler_att(2);  // yaw is the third element
 
 			// Integrate yaw rate to get desired yaw
-			const float desired_yaw = current_yaw + yaw_rate * dt;
-			const Vector3f attitude_des = Vector3f(0.0f, 0.0f, desired_yaw);
+			// const float desired_yaw = current_yaw + yaw_rate * dt;
+			// const Vector3f attitude_des = Vector3f(0.0f, 0.0f, desired_yaw);
+
+			// Initialize desired yaw to current yaw on first entry to manual mode
+			if (!_manual_yaw_initialized) {
+			_manual_desired_yaw = current_yaw;
+			_manual_yaw_initialized = true;
+			}
+
+			// Accumulate yaw rate from stick (persistent across iterations)
+			_manual_desired_yaw += yaw_rate * dt;
+
+			const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _manual_desired_yaw);
 
 			pose_controller_6dof(
 				traj_des, attitude_des, _vehicle_attitude, vlocal_pos);
 			// }
-		} else if ((_vcontrol_mode.flag_multicopter_position_control_enabled
-				|| _vcontrol_mode.flag_control_offboard_enabled)
-			&& (_trajectory_setpoint.timestamp >= _time_position_control_enabled)) {
+
+
+		// } else if ((_vcontrol_mode.flag_multicopter_position_control_enabled
+		// 		|| _vcontrol_mode.flag_control_offboard_enabled)
+		// 	&& (_trajectory_setpoint.timestamp >= _time_position_control_enabled)) {
+		// 	// position mode / altitude mode
+
+		} else {
+		    _manual_yaw_initialized = false;  // 離開 manual mode 時重置，下次進入重新鎖定 yaw
+
+		} if ((_vcontrol_mode.flag_multicopter_position_control_enabled
+        		|| _vcontrol_mode.flag_control_offboard_enabled)
+    		    && (_trajectory_setpoint.timestamp >= _time_position_control_enabled)) {
 			// position mode / altitude mode
 
 			_vehicle_constraints_sub.update(&_vehicle_constraints);
@@ -362,24 +383,13 @@ void PFAPOSControl::Run()
 
 			// The flying state including the rampup phase
 			if (flying) {
-				// Desired attitude: roll and pitch from PFA_DES_ROLL / PFA_DES_PITCH parameters
-				// (settable at runtime via MAVLink PARAM_SET), yaw from trajectory setpoint.
-				// pfa_pos_control computes thrust independently using current attitude feedback;
-				// these parameters only change the attitude target forwarded to the attitude controller.
-				//
-				// Guard against NaN yaw: when SET_POSITION_TARGET_LOCAL_NED ignores yaw
-				// (type_mask bit 10 = 1), PX4 sets trajectory_setpoint.yaw = NaN.
-				// pfa_att_control uses _checkAllFinite() on the full euler vector, so a single
-				// NaN component zeroes out the entire attitude command including pitch.
-				const Eulerf euler_att_now(Quatf(_vehicle_attitude.q));
+				// const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw); // roll and pitch = 0, yaw from trajectory setpoint
+				// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
+				const Eulerf euler_att_now_temp(Quatf(_vehicle_attitude.q));
 				const float safe_yaw = PX4_ISFINITE(_trajectory_setpoint.yaw)
 					? _trajectory_setpoint.yaw
-					: euler_att_now(2);   // fall back to current yaw
-				const Vector3f attitude_des = Vector3f(
-					math::radians(_param_des_roll.get()),
-					math::radians(_param_des_pitch.get()),
-					safe_yaw);
-				// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
+					: euler_att_now_temp(2);
+				const Vector3f attitude_des = Vector3f(math::radians(_param_des_roll.get()), math::radians(_param_des_pitch.get()), safe_yaw);
 
 				if (ramping_up) {
 					// Reset position setpoint to current xy-position at the hovering height
