@@ -145,3 +145,36 @@ PARAM_DEFINE_FLOAT(PFA_DES_PITCH, 0.0f);
  * @group PFA Position Control
  */
 PARAM_DEFINE_INT32(PFA_TKF_BYP, 1);
+
+/**
+ * Vertical priority when the body x/y thrust is saturated
+ *
+ * pose_controller_6dof limits the body-frame thrust per axis (x/y to
+ * +-0.3). When the vehicle is tilted, part of the world-frame lift comes
+ * from the body x/y components, so clipping them makes the vehicle sink.
+ * If enabled, the body z thrust is re-computed after the x/y clipping so
+ * that the world-frame vertical force still matches the demand; the
+ * horizontal shortfall is accepted instead (position drifts, altitude is kept).
+ * Only active while x/y are clipped and the tilt is below 60 deg.
+ *
+ * @boolean
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_INT32(PFA_VERT_PRIO, 1);
+
+/**
+ * Minimum body lift while the body x/y thrust is saturated
+ *
+ * Fraction of the hover thrust (PFA_VEH_MASS * g / PFA_MAX_THR) that the
+ * body z thrust may not drop below while x/y are clipped. Last line of
+ * defence against large transient horizontal demands. Not applied when
+ * x/y are not clipped, so normal descents and landing are unaffected, and
+ * never above the takeoff ramp limit. 0 disables the floor.
+ *
+ * @min 0.0
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.05
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_FLOAT(PFA_FUP_MIN, 0.6f);

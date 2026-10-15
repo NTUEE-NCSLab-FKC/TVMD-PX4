@@ -155,15 +155,20 @@ void PFAPOSControl::pose_controller_6dof(
 	// Calculate constrained velocity setpoint
 	// TODO: the position setpoint should be constrained as the velocity setpoint
 	// is saturated.
-	const Vector3f vel_des = _checkAllFinite(Vector3f(traj_des.velocity));
+	// NaN components are handled per axis: a NaN position component disables the
+	// position feedback of that axis only, a NaN velocity component means "zero
+	// velocity" (damping) on that axis. Zeroing the whole vector when a single
+	// component is NaN (e.g. flight tasks set z = NaN while the throttle stick is
+	// off-centre) would silently drop the position hold of the other axes.
+	const Vector3f vel_des = _zeroNonFinite(Vector3f(traj_des.velocity));
 	const Vector3f limited_vel_des = matrix::constrain(vel_des,
 		Vector3f(-_speed_xy_max, -_speed_xy_max, _speed_up_max),
 		Vector3f(_speed_xy_max, _speed_xy_max, _speed_dn_max));
 
 	// Calculate errors
-	const Vector3f err_pos = _checkAllFinite(Vector3f(traj_des.position) - pos);
-	const Vector3f err_vel = _checkAllFinite(limited_vel_des - vel);
-	const Vector3f err_acc = _checkAllFinite(Vector3f(traj_des.acceleration));
+	const Vector3f err_pos = _zeroNonFinite(Vector3f(traj_des.position) - pos);
+	const Vector3f err_vel = _zeroNonFinite(limited_vel_des - vel);
+	const Vector3f err_acc = _zeroNonFinite(Vector3f(traj_des.acceleration));
 
 	// NED frame (north east down)
 	const Vector3f resist_gravity = Vector3f(0, 0, -CONSTANTS_ONE_G);
@@ -179,9 +184,46 @@ void PFAPOSControl::pose_controller_6dof(
 
 	// Limit thrust vector and check for saturation
 	// NED frame (north east down)
-	const Vector3f limited_thrust_des = matrix::constrain(rotated_input,
+	Vector3f limited_thrust_des = matrix::constrain(rotated_input,
 		Vector3f(-_thrust_xy_max, -_thrust_xy_max, _thrust_up_max),
 		Vector3f(_thrust_xy_max, _thrust_xy_max, _thrust_min));
+
+	// Vertical priority (PFA_VERT_PRIO): the body z computed above assumes the full
+	// body x/y demand is delivered, because part of the world-frame lift comes from
+	// the body x/y components when the vehicle is tilted. If x/y were clipped, that
+	// part is lost and the vehicle sinks (and the position error that caused the
+	// clipping keeps growing). Re-solve body z so that the world-frame vertical force
+	// still equals the demand, and accept the horizontal shortfall instead:
+	//   world_z = R(2,0)*bx + R(2,1)*by + R(2,2)*bz  ->  bz = (F_z - R20*bx - R21*by) / R22
+	const bool xy_clipped = fabsf(limited_thrust_des(0) - rotated_input(0)) > FLT_EPSILON
+				|| fabsf(limited_thrust_des(1) - rotated_input(1)) > FLT_EPSILON;
+
+	if (xy_clipped) {
+		if (_param_vert_prio.get() > 0) {
+			const Dcmf R(q_att);	// body FRD -> NED
+			const float r22 = R(2, 2);	// cos(roll) * cos(pitch)
+
+			if (r22 > 0.5f) {	// only for tilts below 60 deg
+				const float bz = (control_normalized_force(2)
+						  - R(2, 0) * limited_thrust_des(0)
+						  - R(2, 1) * limited_thrust_des(1)) / r22;
+				limited_thrust_des(2) = math::constrain(bz, _thrust_up_max, _thrust_min);
+			}
+		}
+
+		// Lift floor (PFA_FUP_MIN): while saturated, never let the body lift drop
+		// below a fraction of the hover thrust. Only applied while x/y are clipped,
+		// so normal descents and landing are not affected, and never above the
+		// current takeoff ramp limit (_thrust_up_max).
+		const float fup_min = _param_fup_min.get();
+
+		if (fup_min > 0.f) {
+			const float hover_z = -CONSTANTS_ONE_G * _param_vehicle_mass.get()
+					      / _param_vehicle_max_thrust.get();	// < 0 (NED, up)
+			const float floor_z = math::max(fup_min * hover_z, _thrust_up_max);
+			limited_thrust_des(2) = math::min(limited_thrust_des(2), floor_z);
+		}
+	}
 
 	publish_attitude_setpoint(limited_thrust_des, euler_attitude_des);
 
@@ -222,6 +264,83 @@ void PFAPOSControl::stabilization_controller_6dof(
 	pose_controller_6dof(stab_traj_des, euler_attitude_des, vehicle_attitude, vlocal_pos);
 }
 
+/**
+ * Yaw setpoint for the position branch.
+ * - finite trajectory yaw: use it (offboard scripts, POSCTL with the yaw stick released)
+ * - yaw NaN but yawspeed finite: integrate the yaw rate (POSCTL while the yaw stick is
+ *   moved; before, the target fell back to the current yaw and the stick had no effect)
+ * - both NaN: current yaw, i.e. yaw is not controlled (unchanged behaviour)
+ */
+float PFAPOSControl::position_yaw_setpoint(const trajectory_setpoint_s &traj_sp, const float dt)
+{
+	const float yaw_now = Eulerf(Quatf(_vehicle_attitude.q))(2);
+
+	if (PX4_ISFINITE(traj_sp.yaw)) {
+		_pos_yaw_sp = traj_sp.yaw;
+		_pos_yaw_valid = true;
+
+	} else if (PX4_ISFINITE(traj_sp.yawspeed)) {
+		if (!_pos_yaw_valid) {
+			_pos_yaw_sp = yaw_now;
+			_pos_yaw_valid = true;
+		}
+
+		_pos_yaw_sp = matrix::wrap_pi(_pos_yaw_sp + traj_sp.yawspeed * dt);
+
+	} else {
+		_pos_yaw_sp = yaw_now;
+		_pos_yaw_valid = false;
+	}
+
+	return _pos_yaw_sp;
+}
+
+/**
+ * Hold setpoint: latch position and heading when Hold is entered, follow EKF resets.
+ */
+void PFAPOSControl::update_hold_setpoint(const bool hold_mode, const vehicle_local_position_s &vlocal_pos)
+{
+	if (!hold_mode) {
+		_hold_active = false;
+		return;
+	}
+
+	if (!_hold_active) {
+		_hold_setpoint = {};
+		_hold_setpoint.position[0] = vlocal_pos.x;
+		_hold_setpoint.position[1] = vlocal_pos.y;
+		_hold_setpoint.position[2] = vlocal_pos.z;
+		_hold_setpoint.yaw = Eulerf(Quatf(_vehicle_attitude.q))(2);
+		_hold_setpoint.yawspeed = NAN;
+		_hold_xy_reset_counter = vlocal_pos.xy_reset_counter;
+		_hold_z_reset_counter = vlocal_pos.z_reset_counter;
+		_hold_heading_reset_counter = vlocal_pos.heading_reset_counter;
+		_hold_active = true;
+		PX4_INFO("PFA hold at x %.2f y %.2f z %.2f yaw %.1f deg",
+			 (double)vlocal_pos.x, (double)vlocal_pos.y, (double)vlocal_pos.z,
+			 (double)math::degrees(_hold_setpoint.yaw));
+	}
+
+	// keep the latched setpoint at the same physical place across estimator resets
+	if (vlocal_pos.xy_reset_counter != _hold_xy_reset_counter) {
+		_hold_setpoint.position[0] += vlocal_pos.delta_xy[0];
+		_hold_setpoint.position[1] += vlocal_pos.delta_xy[1];
+		_hold_xy_reset_counter = vlocal_pos.xy_reset_counter;
+	}
+
+	if (vlocal_pos.z_reset_counter != _hold_z_reset_counter) {
+		_hold_setpoint.position[2] += vlocal_pos.delta_z;
+		_hold_z_reset_counter = vlocal_pos.z_reset_counter;
+	}
+
+	if (vlocal_pos.heading_reset_counter != _hold_heading_reset_counter) {
+		_hold_setpoint.yaw = matrix::wrap_pi(_hold_setpoint.yaw + vlocal_pos.delta_heading);
+		_hold_heading_reset_counter = vlocal_pos.heading_reset_counter;
+	}
+
+	_hold_setpoint.timestamp = vlocal_pos.timestamp;
+}
+
 void PFAPOSControl::Run()
 {
 	if (should_exit()) {
@@ -252,10 +371,18 @@ void PFAPOSControl::Run()
 		_vehicle_attitude_sub.update(&_vehicle_attitude);
 		_trajectory_setpoint_sub.update(&_trajectory_setpoint);
 		_manual_control_setpoint_sub.update(&_manual_control_setpoint);
+		_vehicle_status_sub.update(&_vehicle_status);
 
 		_update_position_control_enable_time();
 
-		if (_vcontrol_mode.flag_control_manual_enabled) {
+		// MANUAL / STABILIZED use the stick velocity controller below. POSCTL and
+		// ALTCTL also have flag_control_manual_enabled set, but they are handled by
+		// the position branch with the flight task's trajectory setpoint; running
+		// both (as before) published two different attitude setpoints per cycle.
+		const bool position_control_mode = _vcontrol_mode.flag_multicopter_position_control_enabled
+						   || _vcontrol_mode.flag_control_offboard_enabled;
+
+		if (_vcontrol_mode.flag_control_manual_enabled && !position_control_mode) {
 			// manual mode: velocity control with level body (TVMD style)
 			// Stick inputs control XY velocity, NOT roll/pitch attitude
 
@@ -359,10 +486,19 @@ void PFAPOSControl::Run()
 		} else {
 		    _manual_yaw_initialized = false;  // 離開 manual mode 時重置，下次進入重新鎖定 yaw
 
-		} if ((_vcontrol_mode.flag_multicopter_position_control_enabled
-        		|| _vcontrol_mode.flag_control_offboard_enabled)
-    		    && (_trajectory_setpoint.timestamp >= _time_position_control_enabled)) {
-			// position mode / altitude mode
+		}
+
+		// Hold (QGC "Hold" = AUTO_LOITER): keep the position and heading at the moment
+		// the mode was entered. The setpoint is generated here, so the mode also works
+		// without GPS (navigator / flight task need a global position for loiter).
+		const bool hold_mode = position_control_mode
+				       && (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LOITER);
+		update_hold_setpoint(hold_mode, vlocal_pos);
+
+		if (position_control_mode
+		    && (hold_mode || (_trajectory_setpoint.timestamp >= _time_position_control_enabled))) {
+			// position mode / altitude mode / offboard / auto modes
+			const trajectory_setpoint_s &traj_sp = hold_mode ? _hold_setpoint : _trajectory_setpoint;
 
 			_vehicle_constraints_sub.update(&_vehicle_constraints);
 
@@ -378,6 +514,10 @@ void PFAPOSControl::Run()
 			// const float speed_down = PX4_ISFINITE(_vehicle_constraints.speed_down) ? _vehicle_constraints.speed_down :
 
 			const bool flying     = (_takeoff.getTakeoffState() >= TakeoffState::rampup);
+
+			if (!flying) {
+				_pos_yaw_valid = false;
+			}
 			const bool ramping_up = (_takeoff.getTakeoffState() == TakeoffState::rampup);
 			// const bool flying_but_ground_contact = (flying && _vehicle_land_detected.ground_contact);
 
@@ -385,22 +525,21 @@ void PFAPOSControl::Run()
 			if (flying) {
 				// const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw); // roll and pitch = 0, yaw from trajectory setpoint
 				// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
-				const Eulerf euler_att_now_temp(Quatf(_vehicle_attitude.q));
-				const float safe_yaw = PX4_ISFINITE(_trajectory_setpoint.yaw)
-					? _trajectory_setpoint.yaw
-					: euler_att_now_temp(2);
-				const Vector3f attitude_des = Vector3f(math::radians(_param_des_roll.get()), math::radians(_param_des_pitch.get()), safe_yaw);
+				const float yaw_sp = position_yaw_setpoint(traj_sp, dt);
+				const Vector3f attitude_des = Vector3f(math::radians(_param_des_roll.get()), math::radians(_param_des_pitch.get()), yaw_sp);
 
 				if (ramping_up) {
 					// Reset position setpoint to current xy-position at the hovering height
 					stabilization_controller_6dof(
-						_trajectory_setpoint, attitude_des, _vehicle_attitude, vlocal_pos);
+						traj_sp, attitude_des, _vehicle_attitude, vlocal_pos);
 				} else {
 					pose_controller_6dof(
-						_trajectory_setpoint, attitude_des, _vehicle_attitude, vlocal_pos);
+						traj_sp, attitude_des, _vehicle_attitude, vlocal_pos);
 				}
 			}
 		} else {
+			_pos_yaw_valid = false;
+
 			// An update is necessary here because otherwise the takeoff state
 			// doesn't get skipped with non-altitude-controlled modes
 			_takeoff.updateTakeoffState(_vcontrol_mode.flag_armed, false, false,
@@ -469,6 +608,7 @@ Publishes `attitude_setpoint` messages.
 ### Implementation
 Currently, this implementation supports only a few modes:
  * Position mode with takeoff
+ * Hold (AUTO_LOITER): holds the position / heading latched on entry, no GPS needed
  * Manual mode
 ### Examples
 CLI usage example:

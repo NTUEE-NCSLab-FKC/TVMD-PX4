@@ -70,6 +70,7 @@
 #include <uORB/topics/vehicle_constraints.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
+#include <uORB/topics/vehicle_status.h>
 #include <uORB/uORB.h>
 
 // #include "MulticopterPositionControl.hpp"
@@ -140,6 +141,7 @@ private:
 	uORB::Subscription _trajectory_setpoint_sub{ORB_ID(trajectory_setpoint)};
 	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription _vcontrol_mode_sub{ORB_ID(vehicle_control_mode)};
+	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_local_position_sub{this, ORB_ID(vehicle_local_position)};
 
@@ -147,9 +149,19 @@ private:
 	trajectory_setpoint_s _trajectory_setpoint{};
 	manual_control_setpoint_s _manual_control_setpoint{};
 	vehicle_control_mode_s _vcontrol_mode{};
+	vehicle_status_s _vehicle_status{};
 
 	float _manual_desired_yaw{0.0f};
 	bool  _manual_yaw_initialized{false};
+
+	float _pos_yaw_sp{0.0f};		/**< yaw setpoint of the position branch (integrated from yawspeed when yaw is NaN) */
+	bool  _pos_yaw_valid{false};
+
+	trajectory_setpoint_s _hold_setpoint{};	/**< latched setpoint of Hold (AUTO_LOITER) */
+	bool    _hold_active{false};
+	uint8_t _hold_xy_reset_counter{0};
+	uint8_t _hold_z_reset_counter{0};
+	uint8_t _hold_heading_reset_counter{0};
 
 	perf_counter_t	_loop_perf;
 
@@ -165,6 +177,8 @@ private:
 		(ParamFloat<px4::params::PFA_DES_PITCH>) _param_des_pitch,
 
 		(ParamInt<px4::params::PFA_TKF_BYP>)    _param_takeoff_bypass,
+		(ParamInt<px4::params::PFA_VERT_PRIO>)  _param_vert_prio,
+		(ParamFloat<px4::params::PFA_FUP_MIN>)  _param_fup_min,
 
 		(ParamFloat<px4::params::PFA_VEH_MASS>) _param_vehicle_mass,
 		(ParamFloat<px4::params::PFA_MAX_THR>)  _param_vehicle_max_thrust,
@@ -198,6 +212,18 @@ private:
 			const Vector3f &euler_attitude_des,
 			const vehicle_attitude_s &vehicle_attitude,
 			const vehicle_local_position_s &vlocal_pos);
+
+	float position_yaw_setpoint(const trajectory_setpoint_s &traj_sp, const float dt);
+
+	void update_hold_setpoint(const bool hold_mode, const vehicle_local_position_s &vlocal_pos);
+
+	static inline Vector3f _zeroNonFinite(const Vector3f &vec) {
+		Vector3f out = vec;
+		for (int i = 0; i < 3; i++) {
+			if (!PX4_ISFINITE(out(i))) out(i) = 0.0f;
+		}
+		return out;
+	}
 
 	static inline const Vector3f _checkAllFinite(const Vector3f & vec) {
 		if (!vec.isAllFinite()) return Vector3f(0.0f, 0.0f, 0.0f);
