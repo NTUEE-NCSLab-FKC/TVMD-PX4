@@ -548,11 +548,17 @@ void PFAPOSControl::Run()
 	}
 
 	// Publish takeoff status
+	// tilt_limit must be filled in: the POSCTL flight task (StickAccelerationXY) limits the
+	// horizontal stick acceleration to tan(tilt_limit) * g. It was left at 0, so the stick
+	// acceleration was scaled to zero and POSCTL did not move in x/y at all. The body stays
+	// level here, so this only acts as a horizontal acceleration limit (MPC_TILTMAX_AIR).
 	const uint8_t takeoff_state = static_cast<uint8_t>(_takeoff.getTakeoffState());
+	const float tilt_limit = math::radians(_param_mpc_tiltmax_air.get());
 
-	if (takeoff_state != _takeoff_status_pub.get().takeoff_state) {
+	if (takeoff_state != _takeoff_status_pub.get().takeoff_state
+	    || fabsf(tilt_limit - _takeoff_status_pub.get().tilt_limit) > FLT_EPSILON) {
 		_takeoff_status_pub.get().takeoff_state = takeoff_state;
-		// _takeoff_status_pub.get().tilt_limit = _tilt_limit_slew_rate.getState();
+		_takeoff_status_pub.get().tilt_limit = tilt_limit;
 		_takeoff_status_pub.get().timestamp = hrt_absolute_time();
 		_takeoff_status_pub.update();
 	}
