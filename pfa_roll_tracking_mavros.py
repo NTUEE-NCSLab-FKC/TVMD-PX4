@@ -56,6 +56,15 @@ ROLL_RAMP_TIME   = 4.0        # roll 0°→45° 爬升時間 (s)
 TRACK_PHASE_DUR  = 30.0       # 維持 roll=45° 的追蹤時長 (s)
 PARAM_STEP_DEG   = 5.0        # 每次 PARAM_SET 的 roll 步進量 (deg)
 
+# 姿態偏差補償：指令 0° 懸停時實測姿態有穩態偏差（重心 / 電纜力矩、姿態迴路沒有積分，
+# 例如 roll ≈ −5°、pitch ≈ +5°）。水平懸停的最後 BIAS_MEASURE_S 秒量測平均偏差，
+# 之後送出的指令 = 參考角 − 偏差，讓「實測」姿態追參考角（以真正的 0° 為基準）。
+# 注意：補償只移動指令，干擾力矩仍在，舵機用掉的角度不變（兩側可用角度不對稱）。
+BIAS_COMP         = True    # False = 不補償（指令 = 參考角）
+BIAS_MEASURE_S    = 5.0     # 量測時間 (s)：PFA_DES_ROLL/PITCH = 0° 懸停，取實測平均
+BIAS_MAX_DEG      = 8.0     # 偏差上限 (deg)：超過視為異常，補償量限制在 ±BIAS_MAX_DEG
+BIAS_SETTLE_S     = 3.0     # 套用補償後等待姿態穩定、再驗證殘差的時間 (s)
+
 ALT_TOL          = 0.15       # 高度容忍範圍 (m)
 HOVER_STABLE_TIME = 3.0       # 在容忍範圍內連續 N 秒才確認穩定
 
@@ -103,6 +112,54 @@ def get_roll_deg():
     o = _imu_data.orientation
     roll_rad, _, _ = euler_from_quaternion([o.x, o.y, o.z, o.w])
     return math.degrees(roll_rad)
+
+
+def get_pitch_deg():
+    """IMU pitch (度，PX4 慣例：正值 = 機頭朝上)。
+    MAVROS imu/data 為 FLU：繞 +y(左) 正轉是機頭朝下，與 PX4 FRD 反號。"""
+    o = _imu_data.orientation
+    _, pitch_rad, _ = euler_from_quaternion([o.x, o.y, o.z, o.w])
+    return -math.degrees(pitch_rad)
+
+
+def sample_attitude(duration):
+    """持續送 hover setpoint 並取樣 duration 秒的實測 roll / pitch (deg, PX4 慣例)。
+    回傳 (roll 平均, pitch 平均, roll 標準差, pitch 標準差)。"""
+    rs, ps = [], []
+    t_end = rospy.Time.now() + rospy.Duration(duration)
+    while not rospy.is_shutdown() and rospy.Time.now() < t_end:
+        sp_pub.publish(make_hover_setpoint())
+        rs.append(get_roll_deg())
+        ps.append(get_pitch_deg())
+        rate.sleep()
+    if not rs:
+        return 0.0, 0.0, 0.0, 0.0
+    mr, mp = sum(rs) / len(rs), sum(ps) / len(ps)
+    sr = math.sqrt(sum((v - mr) ** 2 for v in rs) / len(rs))
+    sp = math.sqrt(sum((v - mp) ** 2 for v in ps) / len(ps))
+    return mr, mp, sr, sp
+
+
+def measure_and_apply_bias():
+    """量測姿態偏差並把補償寫入 PFA_DES_ROLL/PITCH；回傳 (bias_roll, bias_pitch) deg。"""
+    rospy.loginfo(f"\n[Step 4b] Measuring attitude bias for {BIAS_MEASURE_S:.0f} s "
+                  f"(PFA_DES_ROLL/PITCH = 0°)...")
+    mr, mp, sr, sp = sample_attitude(BIAS_MEASURE_S)
+    rospy.loginfo(f"  measured roll {mr:+.1f}° (σ {sr:.1f}°)   pitch {mp:+.1f}° (σ {sp:.1f}°)")
+    br = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mr))
+    bp = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mp))
+    if (br, bp) != (mr, mp):
+        rospy.logwarn(f"  bias exceeds ±{BIAS_MAX_DEG:.0f}° → clipped to "
+                      f"roll {br:+.1f}°, pitch {bp:+.1f}°（請檢查重心 / 電纜）")
+    rospy.loginfo(f"\n[Step 4c] Bias compensation: PFA_DES_ROLL = {-br:+.1f}°, "
+                  f"PFA_DES_PITCH = {-bp:+.1f}°")
+    for name, val in (('PFA_DES_ROLL', -br), ('PFA_DES_PITCH', -bp)):
+        ok = param_set(name, round(val, 2))
+        rospy.loginfo(f"  {name} = {val:+.1f}° ... {'OK' if ok else 'FAILED'}")
+    sample_attitude(max(0.0, BIAS_SETTLE_S - 2.0))
+    cr, cp, _, _ = sample_attitude(2.0)
+    rospy.loginfo(f"  after compensation: roll {cr:+.1f}°  pitch {cp:+.1f}°  (目標 0°)")
+    return br, bp
 
 
 def get_yaw_rad():
@@ -341,7 +398,9 @@ while not rospy.is_shutdown():
 # Step 4 – 水平懸停保持 HOVER_PHASE_DUR 秒
 # ─────────────────────────────────────────────────────────────
 rospy.loginfo(f"\n[Step 4] Holding level hover for {HOVER_PHASE_DUR:.0f} s...")
-t_end    = rospy.Time.now() + rospy.Duration(HOVER_PHASE_DUR)
+# 偏差量測佔用懸停的最後 BIAS_MEASURE_S 秒
+t_end    = rospy.Time.now() + rospy.Duration(
+    max(0.0, HOVER_PHASE_DUR - (BIAS_MEASURE_S if BIAS_COMP else 0.0)))
 last_log = rospy.Time.now()
 while not rospy.is_shutdown() and rospy.Time.now() < t_end:
     sp_pub.publish(make_hover_setpoint())
@@ -351,6 +410,8 @@ while not rospy.is_shutdown() and rospy.Time.now() < t_end:
                       f"remaining={(t_end - now).to_sec():.1f} s")
         last_log = now
     rate.sleep()
+
+bias_r, bias_p = measure_and_apply_bias() if BIAS_COMP else (0.0, 0.0)
 
 # ─────────────────────────────────────────────────────────────
 # Step 5 – 漸進式 roll ramp：透過 /mavros/param/set 逐步更新 PFA_DES_ROLL
@@ -385,8 +446,11 @@ while not rospy.is_shutdown() and abs(current_roll_cmd - TARGET_ROLL_DEG) > 0.01
        (step < 0 and next_roll < TARGET_ROLL_DEG):
         next_roll = TARGET_ROLL_DEG
 
-    ok = param_set('PFA_DES_ROLL', next_roll)
-    rospy.loginfo(f"  PFA_DES_ROLL = {next_roll:.1f}° ... {'OK' if ok else 'FAILED'}")
+    # next_roll 是參考角（希望實測達到的角度），實際送出 參考角 − bias_r
+    roll_param = next_roll - bias_r
+    ok = param_set('PFA_DES_ROLL', round(roll_param, 2))
+    rospy.loginfo(f"  PFA_DES_ROLL = {roll_param:.1f}° (ref {next_roll:.1f}°) ... "
+                  f"{'OK' if ok else 'FAILED'}")
     current_roll_cmd = next_roll
 
     t_step   = rospy.Time.now() + rospy.Duration(PARAM_STEP_WAIT)
@@ -396,7 +460,7 @@ while not rospy.is_shutdown() and abs(current_roll_cmd - TARGET_ROLL_DEG) > 0.01
         now = rospy.Time.now()
         if (now - last_log).to_sec() > 0.5:
             rospy.loginfo(f"    alt={get_altitude():.2f} m  "
-                          f"roll_cmd={current_roll_cmd:.1f}°  "
+                          f"roll_ref={current_roll_cmd:.1f}°  "
                           f"roll_now={get_roll_deg():.1f}°")
             last_log = now
         rate.sleep()
@@ -406,8 +470,8 @@ while not rospy.is_shutdown() and abs(current_roll_cmd - TARGET_ROLL_DEG) > 0.01
 # ─────────────────────────────────────────────────────────────
 rospy.loginfo(f"\n[Step 6] Holding roll={TARGET_ROLL_DEG:.0f}°, "
               f"alt={TARGET_ALT_M} m for {TRACK_PHASE_DUR:.0f} s...")
-rospy.loginfo(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'RollCmd':>8}  {'RollNow':>8}")
-rospy.loginfo("  " + "─" * 46)
+rospy.loginfo(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'RollRef':>8}  {'RollNow':>8}  {'RollErr':>8}")
+rospy.loginfo("  " + "─" * 56)
 
 t_track  = rospy.Time.now()
 last_log = rospy.Time.now()
@@ -419,8 +483,9 @@ while not rospy.is_shutdown() and (rospy.Time.now() - t_track).to_sec() < TRACK_
     alt     = get_altitude()
 
     if (now - last_log).to_sec() >= 0.5:
+        r_deg = get_roll_deg()
         rospy.loginfo(f"  {elapsed:6.1f}s  {alt:6.2f}m  {TARGET_ALT_M - alt:+7.2f}m  "
-                      f"{TARGET_ROLL_DEG:7.1f}°  {get_roll_deg():7.1f}°")
+                      f"{TARGET_ROLL_DEG:7.1f}°  {r_deg:7.1f}°  {r_deg - TARGET_ROLL_DEG:+7.1f}°")
         last_log = now
     rate.sleep()
 
@@ -429,8 +494,9 @@ rospy.loginfo("  Attitude tracking complete.")
 # ─────────────────────────────────────────────────────────────
 # Step 7 – 降落前先將 PFA_DES_ROLL 歸零
 # ─────────────────────────────────────────────────────────────
-rospy.loginfo("\n[Step 7] Resetting PFA_DES_ROLL to 0° before landing...")
+rospy.loginfo("\n[Step 7] Resetting PFA_DES_ROLL / PFA_DES_PITCH to 0° before landing...")
 param_set('PFA_DES_ROLL', 0.0)
+param_set('PFA_DES_PITCH', 0.0)     # 偏差補償可能已改過 pitch
 rospy.sleep(1.0)
 
 rospy.loginfo("Landing (AUTO.LAND)...")

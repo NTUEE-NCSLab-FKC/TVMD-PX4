@@ -55,6 +55,15 @@ PITCH_RAMP_TIME   = 4.0     # pitch 從 0° 爬升到目標角度的總時間 (s
 TRACK_PHASE_DUR   = 30.0    # 維持目標 pitch 的追蹤時長 (s)
 PARAM_STEP_DEG    = 5.0     # 每次 PARAM_SET 的步進量 (deg)
 
+# 姿態偏差補償：指令 0° 懸停時實測姿態有穩態偏差（重心 / 電纜力矩、姿態迴路沒有積分，
+# 例如 roll ≈ −5°、pitch ≈ +5°）。水平懸停的最後 BIAS_MEASURE_S 秒量測平均偏差，
+# 之後送出的指令 = 參考角 − 偏差，讓「實測」姿態追參考角（以真正的 0° 為基準）。
+# 注意：補償只移動指令，干擾力矩仍在，舵機用掉的角度不變（兩側可用角度不對稱）。
+BIAS_COMP         = True    # False = 不補償（指令 = 參考角）
+BIAS_MEASURE_S    = 5.0     # 量測時間 (s)：PFA_DES_ROLL/PITCH = 0° 懸停，取實測平均
+BIAS_MAX_DEG      = 8.0     # 偏差上限 (deg)：超過視為異常，補償量限制在 ±BIAS_MAX_DEG
+BIAS_SETTLE_S     = 3.0     # 套用補償後等待姿態穩定、再驗證殘差的時間 (s)
+
 ALT_TOL           = 0.15    # 懸停高度容差 (m)
 HOVER_STABLE_TIME = 3.0     # 判定穩定懸停所需的持續時間 (s)
 
@@ -336,6 +345,44 @@ def param_get(name: str, timeout: float = 3.0):
     return None
 
 
+def sample_attitude(duration: float):
+    """取樣 duration 秒的實測 roll / pitch (deg)。
+    回傳 (roll 平均, pitch 平均, roll 標準差, pitch 標準差)；以 20 Hz 讀快取，
+    ATTITUDE 較慢時會重複取到同一筆，不影響平均。"""
+    rs, ps = [], []
+    end = time.time() + duration
+    while time.time() < end:
+        rs.append(math.degrees(_att['roll']))
+        ps.append(math.degrees(_att['pitch']))
+        time.sleep(0.05)
+    mr, mp = sum(rs) / len(rs), sum(ps) / len(ps)
+    sr = math.sqrt(sum((v - mr) ** 2 for v in rs) / len(rs))
+    sp = math.sqrt(sum((v - mp) ** 2 for v in ps) / len(ps))
+    return mr, mp, sr, sp
+
+
+def measure_and_apply_bias():
+    """量測姿態偏差並把補償寫入 PFA_DES_ROLL/PITCH；回傳 (bias_roll, bias_pitch) deg。"""
+    print(f"\n[Step 4b] Measuring attitude bias for {BIAS_MEASURE_S:.0f} s "
+          f"(PFA_DES_ROLL/PITCH = 0°)...")
+    mr, mp, sr, sp = sample_attitude(BIAS_MEASURE_S)
+    print(f"  measured roll {mr:+.1f}° (σ {sr:.1f}°)   pitch {mp:+.1f}° (σ {sp:.1f}°)")
+    br = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mr))
+    bp = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mp))
+    if (br, bp) != (mr, mp):
+        print(f"  WARNING: bias exceeds ±{BIAS_MAX_DEG:.0f}° → clipped to "
+              f"roll {br:+.1f}°, pitch {bp:+.1f}°（請檢查重心 / 電纜）")
+    print(f"\n[Step 4c] Bias compensation: PFA_DES_ROLL = {-br:+.1f}°, "
+          f"PFA_DES_PITCH = {-bp:+.1f}°")
+    for name, val in (('PFA_DES_ROLL', -br), ('PFA_DES_PITCH', -bp)):
+        ok = param_set(name, round(val, 2))
+        print(f"  {name} = {val:+.1f}° ... {'OK' if ok else 'FAILED'}")
+    time.sleep(max(0.0, BIAS_SETTLE_S - 2.0))
+    cr, cp, _, _ = sample_attitude(2.0)
+    print(f"  after compensation: roll {cr:+.1f}°  pitch {cp:+.1f}°  (目標 0°)")
+    return br, bp
+
+
 def wait_until(cond, timeout: float) -> bool:
     end = time.time() + timeout
     while time.time() < end:
@@ -517,7 +564,8 @@ while True:
 # Step 4 – 保持水平懸停 HOVER_PHASE_DUR 秒
 # ─────────────────────────────────────────────────────────────
 print(f"\n[Step 4] Holding level hover for {HOVER_PHASE_DUR:.0f} s...")
-end_t      = time.time() + HOVER_PHASE_DUR
+# 偏差量測佔用懸停的最後 BIAS_MEASURE_S 秒
+end_t      = time.time() + max(0.0, HOVER_PHASE_DUR - (BIAS_MEASURE_S if BIAS_COMP else 0.0))
 last_print = 0.0
 
 while time.time() < end_t:
@@ -529,8 +577,12 @@ while time.time() < end_t:
         last_print = now
     time.sleep(0.05)
 
+bias_r, bias_p = measure_and_apply_bias() if BIAS_COMP else (0.0, 0.0)
+
 # ─────────────────────────────────────────────────────────────
 # Step 5 – 漸進式 pitch ramp（逐步 PARAM_SET PFA_DES_PITCH）
+#
+# current_pitch_cmd 是參考角（希望實測達到的角度），實際送出 參考角 − bias_p。
 #
 # 背景執行緒持續發 setpoint，param_set 的 ACK 等待（~1.5 s）
 # 不再造成 setpoint 中斷，OFFBOARD 不會因此掉出。
@@ -552,8 +604,10 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
        (step < 0 and next_pitch < TARGET_PITCH_DEG):
         next_pitch = TARGET_PITCH_DEG
 
-    print(f"  PARAM_SET PFA_DES_PITCH = {next_pitch:.1f}° ... ", end='', flush=True)
-    ok = param_set('PFA_DES_PITCH', next_pitch)   # 背景執行緒在此期間維持 setpoint
+    pitch_param = next_pitch - bias_p
+    print(f"  PARAM_SET PFA_DES_PITCH = {pitch_param:.1f}° (ref {next_pitch:.1f}°) ... ",
+          end='', flush=True)
+    ok = param_set('PFA_DES_PITCH', round(pitch_param, 2))   # 背景執行緒在此期間維持 setpoint
     if ok:
         # 等待 pfa_pos_control 一個 Run() 循環 + 馬達響應
         time.sleep(0.15)
@@ -577,7 +631,7 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
         err    = p_deg - current_pitch_cmd
         now    = time.time()
         if now - last_print > 0.5:
-            print(f"    alt={alt:.2f} m  pitch_cmd={current_pitch_cmd:.1f}°  "
+            print(f"    alt={alt:.2f} m  pitch_ref={current_pitch_cmd:.1f}°  "
                   f"veh_att_sp={sp_deg:.1f}°  pitch_now={p_deg:.1f}°  err={err:+.1f}°")
             last_print = now
         time.sleep(0.05)
@@ -587,7 +641,7 @@ while abs(current_pitch_cmd - TARGET_PITCH_DEG) > 0.01:
 # ─────────────────────────────────────────────────────────────
 print(f"\n[Step 6] Holding pitch={TARGET_PITCH_DEG:.0f}°, alt={TARGET_ALT_M} m "
       f"for {TRACK_PHASE_DUR:.0f} s...")
-print(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'PitchCmd':>9}  {'VehAttSp':>9}  {'PitchNow':>9}  {'PitchErr':>9}")
+print(f"  {'Time':>6}  {'Alt':>6}  {'AltErr':>7}  {'PitchRef':>9}  {'VehAttSp':>9}  {'PitchNow':>9}  {'PitchErr':>9}")
 print("  " + "─" * 72)
 
 track_start    = time.time()
@@ -620,8 +674,9 @@ print("\n  Attitude tracking complete.")
 # ─────────────────────────────────────────────────────────────
 # Step 7 – 降落前將 PFA_DES_PITCH 歸零，切換 AUTO.LAND
 # ─────────────────────────────────────────────────────────────
-print("\n[Step 7] Resetting PFA_DES_PITCH to 0° before landing...")
+print("\n[Step 7] Resetting PFA_DES_PITCH / PFA_DES_ROLL to 0° before landing...")
 param_set('PFA_DES_PITCH', 0.0)
+param_set('PFA_DES_ROLL', 0.0)      # 偏差補償可能已改過 roll
 time.sleep(1.0)
 
 print("Landing (AUTO.LAND)...")

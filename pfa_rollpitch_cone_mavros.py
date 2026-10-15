@@ -42,6 +42,13 @@ pfa_rollpitch_sine_mavros.py 的 90° 相位版本：原地懸停，roll 與 pit
   腳本每拍檢查實測傾角、舵機角度（pymavlink 版）、水平與高度誤差，超標就把指令乘上
   g（g ← 0.7·g）讓出姿態、先保位置；條件都有餘裕時 g 再慢慢回到 1。
 
+■ 姿態偏差補償（BIAS_*）
+  指令 0° 懸停時實測姿態有穩態偏差（例如 roll ≈ −5°、pitch ≈ +5°：重心 / 電纜力矩，
+  姿態迴路沒有積分）。擺動前先以 0° 懸停 BIAS_MEASURE_S 秒量測平均偏差 b，之後送出
+  指令 = 參考角 − b，讓「實測」姿態以真正的 0° 為中心擺動（例如 pitch 偏差 +5°、
+  振幅 15° 時指令為 −20°…+10°，實測為 −15°…+15°）。補償只移動指令，干擾力矩仍在，
+  兩側可用的舵機角度不對稱，所以位置優先保護仍以實測傾角 / 舵機角度判斷。
+
 ■ 安全
   - 期間若離開 OFFBOARD 或被上鎖，立即中止並把 PFA_DES_ROLL/PITCH 設回 0
     （這兩個參數在其他飛行模式下也會被 pfa_pos_control 使用），之後不再切換
@@ -108,6 +115,15 @@ GUARD_XY_ERR_M      = 0.10   # 水平位置誤差上限 (m)
 GUARD_ALT_ERR_M     = 0.15   # 高度誤差上限 (m)
 GUARD_BACKOFF       = 0.7    # 超標時每拍乘上的係數
 GUARD_RECOVER_PER_S = 0.1    # 有餘裕時 g 每秒回升量
+
+# 姿態偏差補償：指令 0° 懸停時實測姿態有穩態偏差（重心 / 電纜力矩、姿態迴路沒有積分，
+# 例如 roll ≈ −5°、pitch ≈ +5°）。水平懸停的最後 BIAS_MEASURE_S 秒量測平均偏差，
+# 之後送出的指令 = 參考角 − 偏差，讓「實測」姿態追參考角（以真正的 0° 為基準）。
+# 注意：補償只移動指令，干擾力矩仍在，舵機用掉的角度不變（兩側可用角度不對稱）。
+BIAS_COMP         = True    # False = 不補償（指令 = 參考角）
+BIAS_MEASURE_S    = 5.0     # 量測時間 (s)：PFA_DES_ROLL/PITCH = 0° 懸停，取實測平均
+BIAS_MAX_DEG      = 8.0     # 偏差上限 (deg)：超過視為異常，補償量限制在 ±BIAS_MAX_DEG
+BIAS_SETTLE_S     = 3.0     # 套用補償後等待姿態穩定、再驗證殘差的時間 (s)
 
 HOVER_BEFORE_S    = 5.0    # 開始擺動前的懸停時間 (s)
 HOVER_AFTER_S     = 5.0    # 擺動結束、姿態歸零後的懸停時間 (s)
@@ -311,6 +327,47 @@ def arm():
         rospy.logwarn(f"arming: {e}")
         return False
 
+def sample_attitude(duration: float):
+    """取樣 duration 秒的實測 roll / pitch (deg)。
+    回傳 (roll 平均, pitch 平均, roll 標準差, pitch 標準差)；setpoint 由 Timer 持續發送。"""
+    rs, ps = [], []
+    r = rospy.Rate(20)
+    t_end = rospy.Time.now() + rospy.Duration(duration)
+    while not rospy.is_shutdown() and rospy.Time.now() < t_end:
+        roll_m, pitch_m = get_roll_pitch_px4_deg()
+        rs.append(roll_m)
+        ps.append(pitch_m)
+        r.sleep()
+    if not rs:
+        return 0.0, 0.0, 0.0, 0.0
+    mr, mp = sum(rs) / len(rs), sum(ps) / len(ps)
+    sr = math.sqrt(sum((v - mr) ** 2 for v in rs) / len(rs))
+    sp = math.sqrt(sum((v - mp) ** 2 for v in ps) / len(ps))
+    return mr, mp, sr, sp
+
+
+def measure_and_apply_bias():
+    """量測姿態偏差並把補償寫入 PFA_DES_ROLL/PITCH；回傳 (bias_roll, bias_pitch) deg。"""
+    rospy.loginfo(f"\n[Step 3b] Measuring attitude bias for {BIAS_MEASURE_S:.0f} s "
+          f"(PFA_DES_ROLL/PITCH = 0°)...")
+    mr, mp, sr, sp = sample_attitude(BIAS_MEASURE_S)
+    rospy.loginfo(f"  measured roll {mr:+.1f}° (σ {sr:.1f}°)   pitch {mp:+.1f}° (σ {sp:.1f}°)")
+    br = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mr))
+    bp = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mp))
+    if (br, bp) != (mr, mp):
+        rospy.logwarn(f"  bias exceeds ±{BIAS_MAX_DEG:.0f}° → clipped to "
+              f"roll {br:+.1f}°, pitch {bp:+.1f}°（請檢查重心 / 電纜）")
+    rospy.loginfo(f"\n[Step 3c] Bias compensation: PFA_DES_ROLL = {-br:+.1f}°, "
+          f"PFA_DES_PITCH = {-bp:+.1f}°")
+    for name, val in (('PFA_DES_ROLL', -br), ('PFA_DES_PITCH', -bp)):
+        ok = param_set(name, round(val, 2))
+        rospy.loginfo(f"  {name} = {val:+.1f}° ... {'OK' if ok else 'FAILED'}")
+    rospy.sleep(max(0.0, BIAS_SETTLE_S - 2.0))
+    cr, cp, _, _ = sample_attitude(2.0)
+    rospy.loginfo(f"  after compensation: roll {cr:+.1f}°  pitch {cp:+.1f}°  (目標 0°)")
+    return br, bp
+
+
 def zero_attitude_params():
     """PFA_DES_ROLL/PITCH 設回 0（重試數次）。"""
     for name in ('PFA_DES_ROLL', 'PFA_DES_PITCH'):
@@ -468,15 +525,16 @@ while not rospy.is_shutdown():
 
 rospy.loginfo(f"\n[Step 3] Level hover for {HOVER_BEFORE_S:.0f} s...")
 rospy.sleep(HOVER_BEFORE_S)
+bias_r, bias_p = measure_and_apply_bias() if BIAS_COMP else (0.0, 0.0)
 
 # ─────────────────────────────────────────────────────────────
 # Step 4: roll + pitch 正弦追蹤（PARAM_SET @ PARAM_HZ）
 # ─────────────────────────────────────────────────────────────
 rospy.loginfo(f"\n[Step 4] Roll/pitch sine tracking for {_TOTAL_S:.0f} s")
-rospy.loginfo(f"  {'t':>5}  {'env':>4}  {'g':>4}  {'roll_cmd':>8} {'roll':>6}  {'pitch_cmd':>9} {'pitch':>6}  "
+rospy.loginfo(f"  {'t':>5}  {'env':>4}  {'g':>4}  {'roll_ref':>8} {'roll':>6}  {'pitch_ref':>9} {'pitch':>6}  "
               f"{'alt':>5}  {'xy_err':>6}")
 
-sent       = {'PFA_DES_ROLL': 0.0, 'PFA_DES_PITCH': 0.0}   # FCU 目前的值（已確認）
+sent       = {'PFA_DES_ROLL': round(-bias_r, 2), 'PFA_DES_PITCH': round(-bias_p, 2)}   # FCU 目前的值（已確認）
 n_updates  = 0
 n_fail     = 0
 err_r, err_p, err_xy = [], [], []
@@ -512,8 +570,12 @@ try:
         g_min = min(g_min, g_safe)
 
         # 以實際時間計算指令；PARAM_SET 慢時只會取樣變粗，不會漂移
+        # roll_m / pitch_m 量測時生效中的參考角 = 這一拍更新前 FCU 的參數值 + 偏差
+        ref_r, ref_p = sent['PFA_DES_ROLL'] + bias_r, sent['PFA_DES_PITCH'] + bias_p
+
+        # 參考角 = g·A·sin(…)；送出 參考角 − 偏差
         roll_c, pitch_c = (g_safe * v for v in attitude_cmd_deg(t))
-        for name, val in (('PFA_DES_ROLL', roll_c), ('PFA_DES_PITCH', pitch_c)):
+        for name, val in (('PFA_DES_ROLL', roll_c - bias_r), ('PFA_DES_PITCH', pitch_c - bias_p)):
             if abs(val - sent[name]) >= PARAM_DEADBAND_DEG:
                 if param_set(name, round(val, 2)):
                     sent[name] = round(val, 2)
@@ -521,18 +583,18 @@ try:
                 else:
                     n_fail += 1
 
-        # 追蹤誤差：與 FCU 目前的參數值比較（不含 PARAM_SET 延遲以外的取樣誤差）
+        # 追蹤誤差：實測與量測當下生效的參考角比較
         if ENV_RAMP_S <= t < ENV_RAMP_S + _FULL_S:
-            err_r.append(sent['PFA_DES_ROLL'] - roll_m)
-            err_p.append(sent['PFA_DES_PITCH'] - pitch_m)
+            err_r.append(ref_r - roll_m)
+            err_p.append(ref_p - pitch_m)
             err_xy.append(xy_e)
-            tilt_cmd.append(math.degrees(math.acos(max(-1.0, min(1.0, math.cos(math.radians(sent['PFA_DES_ROLL'])) * math.cos(math.radians(sent['PFA_DES_PITCH'])))))))
+            tilt_cmd.append(math.degrees(math.acos(max(-1.0, min(1.0, math.cos(math.radians(ref_r)) * math.cos(math.radians(ref_p)))))))
             tilt_meas.append(math.degrees(math.acos(max(-1.0, min(1.0, math.cos(math.radians(roll_m)) * math.cos(math.radians(pitch_m)))))))
 
         now = rospy.Time.now()
         if (now - last_log).to_sec() >= LOG_PERIOD_S:
-            rospy.loginfo(f"  {t:5.1f}  {envelope(t):4.2f}  {g_safe:4.2f}  {sent['PFA_DES_ROLL']:+8.1f} {roll_m:+6.1f}  "
-                          f"{sent['PFA_DES_PITCH']:+9.1f} {pitch_m:+6.1f}  {zn:5.2f}  {xy_e:6.2f}")
+            rospy.loginfo(f"  {t:5.1f}  {envelope(t):4.2f}  {g_safe:4.2f}  {ref_r:+8.1f} {roll_m:+6.1f}  "
+                          f"{ref_p:+9.1f} {pitch_m:+6.1f}  {zn:5.2f}  {xy_e:6.2f}")
             last_log = now
 
         next_tick += param_dt
