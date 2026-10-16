@@ -198,17 +198,17 @@ void PFAPOSControl::pose_controller_6dof(
 	const bool xy_clipped = fabsf(limited_thrust_des(0) - rotated_input(0)) > FLT_EPSILON
 				|| fabsf(limited_thrust_des(1) - rotated_input(1)) > FLT_EPSILON;
 
-	if (xy_clipped) {
-		if (_param_vert_prio.get() > 0) {
-			const Dcmf R(q_att);	// body FRD -> NED
-			const float r22 = R(2, 2);	// cos(roll) * cos(pitch)
+	const Dcmf R(q_att);	// body FRD -> NED
+	const float r22 = R(2, 2);	// cos(roll) * cos(pitch)
 
-			if (r22 > 0.5f) {	// only for tilts below 60 deg
-				const float bz = (control_normalized_force(2)
-						  - R(2, 0) * limited_thrust_des(0)
-						  - R(2, 1) * limited_thrust_des(1)) / r22;
-				limited_thrust_des(2) = math::constrain(bz, _thrust_up_max, _thrust_min);
-			}
+	// Both corrections assume the body z axis points mostly up; beyond 60 deg of tilt
+	// (e.g. during a flip) more body lift would mainly push the vehicle sideways.
+	if (xy_clipped && r22 > 0.5f) {
+		if (_param_vert_prio.get() > 0) {
+			const float bz = (control_normalized_force(2)
+					  - R(2, 0) * limited_thrust_des(0)
+					  - R(2, 1) * limited_thrust_des(1)) / r22;
+			limited_thrust_des(2) = math::constrain(bz, _thrust_up_max, _thrust_min);
 		}
 
 		// Lift floor (PFA_FUP_MIN): while saturated, never let the body lift drop
