@@ -57,10 +57,15 @@ PARAM_DEFINE_INT32(MPC_POS_MODE, 4);
  * The maximum sideways and backward speed can be set differently
  * using MPC_VEL_MAN_SIDE and MPC_VEL_MAN_BACK, respectively.
  *
+ * TVMD: minimum lowered from 3 to 0.5 m/s. pfa_pos_control limits the
+ * horizontal velocity setpoint to 1 m/s, so a larger value only lets the
+ * stick velocity setpoint wind up beyond what is flown and delays braking
+ * after the stick is released.
+ *
  * @unit m/s
- * @min 3
+ * @min 0.5
  * @max 20
- * @increment 1
+ * @increment 0.1
  * @decimal 1
  * @group Multicopter Position Control
  */
