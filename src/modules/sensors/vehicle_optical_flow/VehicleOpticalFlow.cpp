@@ -201,8 +201,10 @@ void VehicleOpticalFlow::Run()
 		}
 
 		_flow_timestamp_sample_last = sensor_optical_flow.timestamp_sample;
-		_flow_integral(0) += sensor_optical_flow.pixel_flow[0];
-		_flow_integral(1) += sensor_optical_flow.pixel_flow[1];
+		// SENS_FLOW_SCALE corrects a sensor scale error (estimated vs. actual travel)
+		const float flow_scale = _param_sens_flow_scale.get();
+		_flow_integral(0) += sensor_optical_flow.pixel_flow[0] * flow_scale;
+		_flow_integral(1) += sensor_optical_flow.pixel_flow[1] * flow_scale;
 
 		_integration_timespan_us += sensor_optical_flow.integration_timespan_us;
 

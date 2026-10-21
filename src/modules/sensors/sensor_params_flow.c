@@ -111,3 +111,24 @@ PARAM_DEFINE_FLOAT(SENS_FLOW_MAXR, 8.f);
  *
  */
 PARAM_DEFINE_FLOAT(SENS_FLOW_RATE, 70.0f);
+
+/**
+ * Optical flow scale factor
+ *
+ * Multiplies the measured flow angle before it is used by the estimators:
+ * velocity = flow rate x SENS_FLOW_SCALE x height above ground.
+ * Set it to (actual distance travelled) / (estimated distance), e.g. from
+ * moving the vehicle a known distance over the flight surface at flight
+ * height. 1.0 leaves the sensor output unchanged.
+ *
+ * Note: the rotational part of the flow is scaled too, while the gyro
+ * compensation is not, so a value far from 1 adds an error during fast
+ * roll/pitch rotations.
+ *
+ * @min 0.5
+ * @max 3.0
+ * @decimal 2
+ * @increment 0.05
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_FLOAT(SENS_FLOW_SCALE, 1.0f);
