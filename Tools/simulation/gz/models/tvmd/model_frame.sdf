@@ -1,0 +1,2632 @@
+<sdf version='1.10'>
+  <model name='tvmd'>
+    <link name='base_link'>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>1.4</mass>
+        <inertia>
+          <ixx>0.02</ixx>
+          <ixy>0.0002778506938765993</ixy>
+          <ixz>-0.00050801012549722409</ixz>
+          <iyy>0.02</iyy>
+          <iyz>-0.0002130772702844956</iyz>
+          <izz>0.02</izz>
+        </inertia>
+      </inertial>
+      <collision name='base_link_collision'>
+        <pose>0 0 0.050000000000000003 0 0 0.78539816339744839</pose>
+        <geometry>
+          <box>
+            <size>0.29999999999999999 0.29999999999999999 0.10000000000000001</size>
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <collision name='base_link_fixed_joint_lump__imu_sensor_link_collision_1'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.02 0.02 0.02</size>
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='base_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/navigator/NavigatorModule-Sim.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.25 0.25 0.75000006 1</diffuse>
+          <ambient>0.25 0.25 0.75000006 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_link_fixed_joint_lump__imu_sensor_link_visual_1'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.02 0.02 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <diffuse>0.25 0.25 0.25 1</diffuse>
+          <ambient>0.25 0.25 0.25 1</ambient>
+        </material>
+      </visual>
+      <sensor name='air_pressure_sensor' type='air_pressure'>
+        <always_on>true</always_on>
+        <update_rate>50</update_rate>
+        <air_pressure>
+          <pressure>
+            <noise type='gaussian'>
+              <mean>0</mean>
+              <stddev>0.01</stddev>
+            </noise>
+          </pressure>
+        </air_pressure>
+      </sensor>
+      <sensor name='imu_sensor' type='imu'>
+        <always_on>true</always_on>
+        <update_rate>250</update_rate>
+        <visualize>true</visualize>
+        <pose>0 0 0 0 0 0</pose>
+      </sensor>
+      <gravity>true</gravity>
+      <gravity>true</gravity>
+      <gravity>true</gravity>
+      <!-- debug: module1_body_link frame (in base_link) -->
+      <visual name='dbg_module1_body_link_axis_x'>
+        <pose>0.1925 0.1825 -0.02 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_body_link_axis_y'>
+        <pose>0.1675 0.2075 -0.02 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 0 1</ambient>
+          <diffuse>0 1 0 1</diffuse>
+          <emissive>0 1 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_body_link_axis_z'>
+        <pose>0.1675 0.1825 0.005 0 0 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>0 0 1 1</ambient>
+          <diffuse>0 0 1 1</diffuse>
+          <emissive>0 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <!-- debug: module2_body_link frame (in base_link) -->
+      <visual name='dbg_module2_body_link_axis_x'>
+        <pose>0.1925 -0.172 -0.02 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_body_link_axis_y'>
+        <pose>0.1675 -0.147 -0.02 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 0 1</ambient>
+          <diffuse>0 1 0 1</diffuse>
+          <emissive>0 1 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_body_link_axis_z'>
+        <pose>0.1675 -0.172 0.005 0 0 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>0 0 1 1</ambient>
+          <diffuse>0 0 1 1</diffuse>
+          <emissive>0 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <!-- debug: module3_body_link frame (in base_link) -->
+      <visual name='dbg_module3_body_link_axis_x'>
+        <pose>-0.125 0.1825 -0.02 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_body_link_axis_y'>
+        <pose>-0.15 0.2075 -0.02 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 0 1</ambient>
+          <diffuse>0 1 0 1</diffuse>
+          <emissive>0 1 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_body_link_axis_z'>
+        <pose>-0.15 0.1825 0.005 0 0 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>0 0 1 1</ambient>
+          <diffuse>0 0 1 1</diffuse>
+          <emissive>0 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <!-- debug: module4_body_link frame (in base_link) -->
+      <visual name='dbg_module4_body_link_axis_x'>
+        <pose>-0.125 -0.175 -0.02 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_body_link_axis_y'>
+        <pose>-0.15 -0.15 -0.02 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 0 1</ambient>
+          <diffuse>0 1 0 1</diffuse>
+          <emissive>0 1 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_body_link_axis_z'>
+        <pose>-0.15 -0.175 0.005 0 0 0</pose>
+        <geometry><cylinder><radius>0.0015</radius><length>0.05</length></cylinder></geometry>
+        <material>
+          <ambient>0 0 1 1</ambient>
+          <diffuse>0 0 1 1</diffuse>
+          <emissive>0 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <!-- Module 1 (Front-Left): Physics at (0.16, 0.175), Visual at (0.1675, 0.1825) -->
+    <!-- Visual offset: (0.0075, 0.0075, 0) -->
+    <joint name='module1_body_gimbal_joint' type='revolute'>
+      <pose relative_to='base_link'>0.16 0.175 -0.02 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>module1_gimbal_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
+          <effort>30000</effort>
+          <velocity>10</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module1_gimbal_link'>
+      <pose relative_to='module1_body_gimbal_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.033955279999999997</mass>
+        <inertia>
+          <ixx>0.00034947999999999999</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1.64e-06</iyy>
+          <iyz>-2e-08</iyz>
+          <izz>0.00034949999999999998</izz>
+        </inertia>
+      </inertial>
+      <collision name='module1_gimbal_link_fixed_joint_lump__module1_actuator_collision_collision'>
+        <pose>0.001 -0.018 0.065 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.40000000000000002</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module1_gimbal_link_visual'>
+        <pose>0.0065 -0.0125 0.065 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Gimbal_Frame_1.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Copper</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.900000036 0.5625 0.25 1</diffuse>
+          <ambient>0.900000036 0.5625 0.25 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <joint name='module1_gimbal_actuator_joint' type='revolute'>
+      <pose relative_to='module1_gimbal_link'>0 0 0 0 0 0</pose>
+      <parent>module1_gimbal_link</parent>
+      <child>module1_actuator_link</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
+          <effort>30000</effort>
+          <velocity>10</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module1_actuator_link'>
+      <pose relative_to='module1_gimbal_actuator_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.1254072</mass>
+        <inertia>
+          <ixx>0.00029933</ixx>
+          <ixy>-1.1000000000000001e-07</ixy>
+          <ixz>-4.7600000000000002e-06</ixz>
+          <iyy>0.00030455</iyy>
+          <iyz>1.8e-07</iyz>
+          <izz>1.575e-05</izz>
+        </inertia>
+      </inertial>
+      <visual name='module1_actuator_link_visual'>
+        <pose>0.0075 0.1925 0 1.5708 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Actuator_1.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Red</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 0.25 0.25 1</diffuse>
+          <ambient>1 0.25 0.25 1</ambient>
+        </material>
+      </visual>
+      <!-- debug: module1_actuator_link_visual frame, rotation 0, origin at module1_body_link -->
+      <visual name='dbg_module1_actuator_link_visual_axis_x'>
+        <pose>0.0485 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head0'>
+        <pose>0.09025 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head1'>
+        <pose>0.09175 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head2'>
+        <pose>0.09325 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head3'>
+        <pose>0.09475 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head4'>
+        <pose>0.09625 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head5'>
+        <pose>0.09775 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head6'>
+        <pose>0.09925 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head7'>
+        <pose>0.10075 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head8'>
+        <pose>0.10225 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head9'>
+        <pose>0.10375 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head10'>
+        <pose>0.10525 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_x_head11'>
+        <pose>0.10675 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y'>
+        <pose>0.0075 0.0485 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head0'>
+        <pose>0.0075 0.09025 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head1'>
+        <pose>0.0075 0.09175 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head2'>
+        <pose>0.0075 0.09325 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head3'>
+        <pose>0.0075 0.09475 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head4'>
+        <pose>0.0075 0.09625 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head5'>
+        <pose>0.0075 0.09775 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head6'>
+        <pose>0.0075 0.09925 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head7'>
+        <pose>0.0075 0.10075 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head8'>
+        <pose>0.0075 0.10225 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head9'>
+        <pose>0.0075 0.10375 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head10'>
+        <pose>0.0075 0.10525 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_y_head11'>
+        <pose>0.0075 0.10675 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z'>
+        <pose>0.0075 0.0075 0.041 0 0 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head0'>
+        <pose>0.0075 0.0075 0.08275 0 0 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head1'>
+        <pose>0.0075 0.0075 0.08425 0 0 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head2'>
+        <pose>0.0075 0.0075 0.08575 0 0 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head3'>
+        <pose>0.0075 0.0075 0.08725 0 0 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head4'>
+        <pose>0.0075 0.0075 0.08875 0 0 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head5'>
+        <pose>0.0075 0.0075 0.09025 0 0 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head6'>
+        <pose>0.0075 0.0075 0.09175 0 0 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head7'>
+        <pose>0.0075 0.0075 0.09325 0 0 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head8'>
+        <pose>0.0075 0.0075 0.09475 0 0 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head9'>
+        <pose>0.0075 0.0075 0.09625 0 0 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head10'>
+        <pose>0.0075 0.0075 0.09775 0 0 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module1_actuator_link_visual_axis_z_head11'>
+        <pose>0.0075 0.0075 0.09925 0 0 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <joint name='module1_actuator_prop1_joint' type='revolute'>
+      <pose relative_to='module1_actuator_link'>0.0075 0.0075 0 0 0 0</pose>
+      <parent>module1_actuator_link</parent>
+      <child>module1_prop1_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <effort>30000</effort>
+          <velocity>10000</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module1_prop1_link'>
+      <pose relative_to='module1_actuator_prop1_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.0025377799999999999</mass>
+        <inertia>
+          <ixx>7.0199999999999997e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.9999999999999998e-08</iyy>
+          <iyz>-8.9999999999999999e-08</iyz>
+          <izz>7.0500000000000003e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='module1_prop1_link_fixed_joint_lump__module1_rotor_1_collision_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.0050000000000000001</length>
+            <radius>0.12</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module1_prop1_link_visual'>
+        <pose>0 0 0.035 1.5708 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Propeller_9047.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Gold</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 0.850000024 0.262499988 1</diffuse>
+          <ambient>1 0.850000024 0.262499988 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <!-- Module 2 (Front-Right): Physics at (0.16, -0.175), Visual at (0.1675, -0.172) -->
+    <!-- Visual offset: (0.0075, 0.003, 0) -->
+    <joint name='module2_body_gimbal_joint' type='revolute'>
+      <pose relative_to='base_link'>0.16 -0.175 -0.02 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>module2_gimbal_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
+          <effort>30000</effort>
+          <velocity>10</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module2_gimbal_link'>
+      <pose relative_to='module2_body_gimbal_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.033955279999999997</mass>
+        <inertia>
+          <ixx>0.00034947999999999999</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1.64e-06</iyy>
+          <iyz>-2e-08</iyz>
+          <izz>0.00034949999999999998</izz>
+        </inertia>
+      </inertial>
+      <collision name='module2_gimbal_link_fixed_joint_lump__module2_actuator_collision_collision'>
+        <pose>0.001 -0.017999999999999999 0.065000000000000002 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.40000000000000002</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module2_gimbal_link_visual'>
+        <pose>0.0065 -0.017 0.065 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Gimbal_Frame_1.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Copper</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.900000036 0.5625 0.25 1</diffuse>
+          <ambient>0.900000036 0.5625 0.25 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <joint name='module2_gimbal_actuator_joint' type='revolute'>
+      <pose relative_to='module2_gimbal_link'>0 0 0 0 0 0</pose>
+      <parent>module2_gimbal_link</parent>
+      <child>module2_actuator_link</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
+          <effort>30000</effort>
+          <velocity>10</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module2_actuator_link'>
+      <pose relative_to='module2_gimbal_actuator_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.1254072</mass>
+        <inertia>
+          <ixx>0.00029933</ixx>
+          <ixy>-1.1000000000000001e-07</ixy>
+          <ixz>-4.7600000000000002e-06</ixz>
+          <iyy>0.00030455</iyy>
+          <iyz>1.8e-07</iyz>
+          <izz>1.575e-05</izz>
+        </inertia>
+      </inertial>
+      <visual name='module2_actuator_link_visual'>
+        <pose>0.0075 0.188 0 1.5708 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Actuator_1.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Red</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 0.25 0.25 1</diffuse>
+          <ambient>1 0.25 0.25 1</ambient>
+        </material>
+      </visual>
+      <!-- debug: module2_actuator_link_visual frame, rotation 0, origin at module2_body_link -->
+      <visual name='dbg_module2_actuator_link_visual_axis_x'>
+        <pose>0.0485 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head0'>
+        <pose>0.09025 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head1'>
+        <pose>0.09175 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head2'>
+        <pose>0.09325 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head3'>
+        <pose>0.09475 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head4'>
+        <pose>0.09625 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head5'>
+        <pose>0.09775 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head6'>
+        <pose>0.09925 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head7'>
+        <pose>0.10075 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head8'>
+        <pose>0.10225 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head9'>
+        <pose>0.10375 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head10'>
+        <pose>0.10525 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_x_head11'>
+        <pose>0.10675 0.003 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y'>
+        <pose>0.0075 0.044 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head0'>
+        <pose>0.0075 0.08575 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head1'>
+        <pose>0.0075 0.08725 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head2'>
+        <pose>0.0075 0.08875 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head3'>
+        <pose>0.0075 0.09025 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head4'>
+        <pose>0.0075 0.09175 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head5'>
+        <pose>0.0075 0.09325 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head6'>
+        <pose>0.0075 0.09475 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head7'>
+        <pose>0.0075 0.09625 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head8'>
+        <pose>0.0075 0.09775 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head9'>
+        <pose>0.0075 0.09925 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head10'>
+        <pose>0.0075 0.10075 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_y_head11'>
+        <pose>0.0075 0.10225 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z'>
+        <pose>0.0075 0.003 0.041 0 0 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head0'>
+        <pose>0.0075 0.003 0.08275 0 0 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head1'>
+        <pose>0.0075 0.003 0.08425 0 0 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head2'>
+        <pose>0.0075 0.003 0.08575 0 0 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head3'>
+        <pose>0.0075 0.003 0.08725 0 0 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head4'>
+        <pose>0.0075 0.003 0.08875 0 0 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head5'>
+        <pose>0.0075 0.003 0.09025 0 0 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head6'>
+        <pose>0.0075 0.003 0.09175 0 0 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head7'>
+        <pose>0.0075 0.003 0.09325 0 0 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head8'>
+        <pose>0.0075 0.003 0.09475 0 0 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head9'>
+        <pose>0.0075 0.003 0.09625 0 0 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head10'>
+        <pose>0.0075 0.003 0.09775 0 0 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module2_actuator_link_visual_axis_z_head11'>
+        <pose>0.0075 0.003 0.09925 0 0 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <joint name='module2_actuator_prop1_joint' type='revolute'>
+      <pose relative_to='module2_actuator_link'>0.0075 0.003 0 0 0 0</pose>
+      <parent>module2_actuator_link</parent>
+      <child>module2_prop1_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <effort>30000</effort>
+          <velocity>10000</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module2_prop1_link'>
+      <pose relative_to='module2_actuator_prop1_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.0025377799999999999</mass>
+        <inertia>
+          <ixx>7.0199999999999997e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.9999999999999998e-08</iyy>
+          <iyz>-8.9999999999999999e-08</iyz>
+          <izz>7.0500000000000003e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='module2_prop1_link_fixed_joint_lump__module2_rotor_1_collision_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.0050000000000000001</length>
+            <radius>0.12</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module2_prop1_link_visual'>
+        <pose>0 0 0.035 1.5708 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Propeller_9047.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Gold</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 0.850000024 0.262499988 1</diffuse>
+          <ambient>1 0.850000024 0.262499988 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <!-- Module 3 (Rear-Left): Physics at (-0.16, 0.175), Visual at (-0.15, 0.1825) -->
+    <!-- Visual offset: (0.01, 0.0075, 0) -->
+    <joint name='module3_body_gimbal_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.16 0.175 -0.02 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>module3_gimbal_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
+          <effort>30000</effort>
+          <velocity>10</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module3_gimbal_link'>
+      <pose relative_to='module3_body_gimbal_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.033955279999999997</mass>
+        <inertia>
+          <ixx>0.00034947999999999999</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1.64e-06</iyy>
+          <iyz>-2e-08</iyz>
+          <izz>0.00034949999999999998</izz>
+        </inertia>
+      </inertial>
+      <collision name='module3_gimbal_link_fixed_joint_lump__module3_actuator_collision_collision'>
+        <pose>0.001 -0.017999999999999999 0.065000000000000002 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.40000000000000002</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module3_gimbal_link_visual'>
+        <pose>0.009 -0.0125 0.065 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Gimbal_Frame_1.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Copper</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.900000036 0.5625 0.25 1</diffuse>
+          <ambient>0.900000036 0.5625 0.25 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <joint name='module3_gimbal_actuator_joint' type='revolute'>
+      <pose relative_to='module3_gimbal_link'>0 0 0 0 0 0</pose>
+      <parent>module3_gimbal_link</parent>
+      <child>module3_actuator_link</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
+          <effort>30000</effort>
+          <velocity>10</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module3_actuator_link'>
+      <pose relative_to='module3_gimbal_actuator_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.1254072</mass>
+        <inertia>
+          <ixx>0.00029933</ixx>
+          <ixy>-1.1000000000000001e-07</ixy>
+          <ixz>-4.7600000000000002e-06</ixz>
+          <iyy>0.00030455</iyy>
+          <iyz>1.8e-07</iyz>
+          <izz>1.575e-05</izz>
+        </inertia>
+      </inertial>
+      <visual name='module3_actuator_link_visual'>
+        <pose>0.01 0.1925 0 1.5708 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Actuator_1.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Red</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 0.25 0.25 1</diffuse>
+          <ambient>1 0.25 0.25 1</ambient>
+        </material>
+      </visual>
+      <!-- debug: module3_actuator_link_visual frame, rotation 0, origin at module3_body_link -->
+      <visual name='dbg_module3_actuator_link_visual_axis_x'>
+        <pose>0.051 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head0'>
+        <pose>0.09275 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head1'>
+        <pose>0.09425 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head2'>
+        <pose>0.09575 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head3'>
+        <pose>0.09725 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head4'>
+        <pose>0.09875 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head5'>
+        <pose>0.10025 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head6'>
+        <pose>0.10175 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head7'>
+        <pose>0.10325 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head8'>
+        <pose>0.10475 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head9'>
+        <pose>0.10625 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head10'>
+        <pose>0.10775 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_x_head11'>
+        <pose>0.10925 0.0075 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y'>
+        <pose>0.01 0.0485 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head0'>
+        <pose>0.01 0.09025 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head1'>
+        <pose>0.01 0.09175 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head2'>
+        <pose>0.01 0.09325 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head3'>
+        <pose>0.01 0.09475 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head4'>
+        <pose>0.01 0.09625 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head5'>
+        <pose>0.01 0.09775 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head6'>
+        <pose>0.01 0.09925 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head7'>
+        <pose>0.01 0.10075 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head8'>
+        <pose>0.01 0.10225 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head9'>
+        <pose>0.01 0.10375 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head10'>
+        <pose>0.01 0.10525 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_y_head11'>
+        <pose>0.01 0.10675 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z'>
+        <pose>0.01 0.0075 0.041 0 0 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head0'>
+        <pose>0.01 0.0075 0.08275 0 0 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head1'>
+        <pose>0.01 0.0075 0.08425 0 0 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head2'>
+        <pose>0.01 0.0075 0.08575 0 0 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head3'>
+        <pose>0.01 0.0075 0.08725 0 0 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head4'>
+        <pose>0.01 0.0075 0.08875 0 0 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head5'>
+        <pose>0.01 0.0075 0.09025 0 0 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head6'>
+        <pose>0.01 0.0075 0.09175 0 0 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head7'>
+        <pose>0.01 0.0075 0.09325 0 0 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head8'>
+        <pose>0.01 0.0075 0.09475 0 0 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head9'>
+        <pose>0.01 0.0075 0.09625 0 0 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head10'>
+        <pose>0.01 0.0075 0.09775 0 0 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module3_actuator_link_visual_axis_z_head11'>
+        <pose>0.01 0.0075 0.09925 0 0 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <joint name='module3_actuator_prop1_joint' type='revolute'>
+      <pose relative_to='module3_actuator_link'>0.01 0.0075 0 0 0 0</pose>
+      <parent>module3_actuator_link</parent>
+      <child>module3_prop1_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <effort>30000</effort>
+          <velocity>10000</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module3_prop1_link'>
+      <pose relative_to='module3_actuator_prop1_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.0025377799999999999</mass>
+        <inertia>
+          <ixx>7.0199999999999997e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.9999999999999998e-08</iyy>
+          <iyz>-8.9999999999999999e-08</iyz>
+          <izz>7.0500000000000003e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='module3_prop1_link_fixed_joint_lump__module3_rotor_1_collision_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.0050000000000000001</length>
+            <radius>0.12</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module3_prop1_link_visual'>
+        <pose>0 0 0.035 1.5708 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Propeller_9047.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Gold</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 0.850000024 0.262499988 1</diffuse>
+          <ambient>1 0.850000024 0.262499988 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <!-- Module 4 (Rear-Right): Physics at (-0.16, -0.175), Visual at (-0.15, -0.175) -->
+    <!-- Visual offset: (0.01, 0, 0) -->
+    <joint name='module4_body_gimbal_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.16 -0.175 -0.02 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>module4_gimbal_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
+          <effort>30000</effort>
+          <velocity>10</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module4_gimbal_link'>
+      <pose relative_to='module4_body_gimbal_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.033955279999999997</mass>
+        <inertia>
+          <ixx>0.00034947999999999999</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1.64e-06</iyy>
+          <iyz>-2e-08</iyz>
+          <izz>0.00034949999999999998</izz>
+        </inertia>
+      </inertial>
+      <collision name='module4_gimbal_link_fixed_joint_lump__module4_actuator_collision_collision'>
+        <pose>0.001 -0.017999999999999999 0.065000000000000002 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.40000000000000002</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module4_gimbal_link_visual'>
+        <pose>0.009 -0.02 0.065 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Gimbal_Frame_1.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Copper</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.900000036 0.5625 0.25 1</diffuse>
+          <ambient>0.900000036 0.5625 0.25 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <joint name='module4_gimbal_actuator_joint' type='revolute'>
+      <pose relative_to='module4_gimbal_link'>0 0 0 0 0 0</pose>
+      <parent>module4_gimbal_link</parent>
+      <child>module4_actuator_link</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-0.78539816339744828</lower>
+          <upper>0.78539816339744828</upper>
+          <effort>30000</effort>
+          <velocity>10</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module4_actuator_link'>
+      <pose relative_to='module4_gimbal_actuator_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.1254072</mass>
+        <inertia>
+          <ixx>0.00029933</ixx>
+          <ixy>-1.1000000000000001e-07</ixy>
+          <ixz>-4.7600000000000002e-06</ixz>
+          <iyy>0.00030455</iyy>
+          <iyz>1.8e-07</iyz>
+          <izz>1.575e-05</izz>
+        </inertia>
+      </inertial>
+      <visual name='module4_actuator_link_visual'>
+        <pose>0.01 0.185 0 1.5708 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Actuator_1.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Red</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 0.25 0.25 1</diffuse>
+          <ambient>1 0.25 0.25 1</ambient>
+        </material>
+      </visual>
+      <!-- debug: module4_actuator_link_visual frame, rotation 0, origin at module4_body_link -->
+      <visual name='dbg_module4_actuator_link_visual_axis_x'>
+        <pose>0.051 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head0'>
+        <pose>0.09275 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head1'>
+        <pose>0.09425 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head2'>
+        <pose>0.09575 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head3'>
+        <pose>0.09725 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head4'>
+        <pose>0.09875 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head5'>
+        <pose>0.10025 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head6'>
+        <pose>0.10175 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head7'>
+        <pose>0.10325 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head8'>
+        <pose>0.10475 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head9'>
+        <pose>0.10625 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head10'>
+        <pose>0.10775 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_x_head11'>
+        <pose>0.10925 0 0 0 1.5708 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>1 0 1 1</ambient>
+          <diffuse>1 0 1 1</diffuse>
+          <emissive>1 0 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y'>
+        <pose>0.01 0.041 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head0'>
+        <pose>0.01 0.08275 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head1'>
+        <pose>0.01 0.08425 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head2'>
+        <pose>0.01 0.08575 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head3'>
+        <pose>0.01 0.08725 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head4'>
+        <pose>0.01 0.08875 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head5'>
+        <pose>0.01 0.09025 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head6'>
+        <pose>0.01 0.09175 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head7'>
+        <pose>0.01 0.09325 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head8'>
+        <pose>0.01 0.09475 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head9'>
+        <pose>0.01 0.09625 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head10'>
+        <pose>0.01 0.09775 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_y_head11'>
+        <pose>0.01 0.09925 0 -1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 0.4 0 1</ambient>
+          <diffuse>0 0.4 0 1</diffuse>
+          <emissive>0 0.4 0 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z'>
+        <pose>0.01 0 0.041 0 0 0</pose>
+        <geometry><cylinder><radius>0.0012</radius><length>0.082</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head0'>
+        <pose>0.01 0 0.08275 0 0 0</pose>
+        <geometry><cylinder><radius>0.0043125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head1'>
+        <pose>0.01 0 0.08425 0 0 0</pose>
+        <geometry><cylinder><radius>0.0039375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head2'>
+        <pose>0.01 0 0.08575 0 0 0</pose>
+        <geometry><cylinder><radius>0.0035625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head3'>
+        <pose>0.01 0 0.08725 0 0 0</pose>
+        <geometry><cylinder><radius>0.0031875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head4'>
+        <pose>0.01 0 0.08875 0 0 0</pose>
+        <geometry><cylinder><radius>0.0028125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head5'>
+        <pose>0.01 0 0.09025 0 0 0</pose>
+        <geometry><cylinder><radius>0.0024375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head6'>
+        <pose>0.01 0 0.09175 0 0 0</pose>
+        <geometry><cylinder><radius>0.0020625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head7'>
+        <pose>0.01 0 0.09325 0 0 0</pose>
+        <geometry><cylinder><radius>0.0016875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head8'>
+        <pose>0.01 0 0.09475 0 0 0</pose>
+        <geometry><cylinder><radius>0.0013125</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head9'>
+        <pose>0.01 0 0.09625 0 0 0</pose>
+        <geometry><cylinder><radius>0.0009375</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head10'>
+        <pose>0.01 0 0.09775 0 0 0</pose>
+        <geometry><cylinder><radius>0.0005625</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <visual name='dbg_module4_actuator_link_visual_axis_z_head11'>
+        <pose>0.01 0 0.09925 0 0 0</pose>
+        <geometry><cylinder><radius>0.0001875</radius><length>0.0015</length></cylinder></geometry>
+        <material>
+          <ambient>0 1 1 1</ambient>
+          <diffuse>0 1 1 1</diffuse>
+          <emissive>0 1 1 1</emissive>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <joint name='module4_actuator_prop1_joint' type='revolute'>
+      <pose relative_to='module4_actuator_link'>0.01 0 0 0 0 0</pose>
+      <parent>module4_actuator_link</parent>
+      <child>module4_prop1_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <effort>30000</effort>
+          <velocity>10000</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='module4_prop1_link'>
+      <pose relative_to='module4_actuator_prop1_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.0025377799999999999</mass>
+        <inertia>
+          <ixx>7.0199999999999997e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>4.9999999999999998e-08</iyy>
+          <iyz>-8.9999999999999999e-08</iyz>
+          <izz>7.0500000000000003e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='module4_prop1_link_fixed_joint_lump__module4_rotor_1_collision_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.0050000000000000001</length>
+            <radius>0.12</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='module4_prop1_link_visual'>
+        <pose>0 0 0.035 1.5708 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>model://tvmd/meshes/agent/Propeller_9047.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Gold</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 0.850000024 0.262499988 1</diffuse>
+          <ambient>1 0.850000024 0.262499988 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+      <gravity>true</gravity>
+    </link>
+    <plugin name='gz::sim::systems::JointPositionController' filename='gz-sim-joint-position-controller-system'>
+      <joint_name>module1_body_gimbal_joint</joint_name>
+      <sub_topic>servo_1</sub_topic>
+    </plugin>
+    <plugin name='gz::sim::systems::JointPositionController' filename='gz-sim-joint-position-controller-system'>
+      <joint_name>module1_gimbal_actuator_joint</joint_name>
+      <sub_topic>servo_0</sub_topic>
+    </plugin>
+    <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+      <jointName>module1_actuator_prop1_joint</jointName>
+      <linkName>module1_prop1_link</linkName>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>1500</maxRotVelocity> # 1000
+      <motorConstant>2e-05</motorConstant> # 2e-05
+      <momentConstant>0.06</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>0</motorNumber>
+      <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin name='gz::sim::systems::JointPositionController' filename='gz-sim-joint-position-controller-system'>
+      <joint_name>module2_body_gimbal_joint</joint_name>
+      <sub_topic>servo_3</sub_topic>
+    </plugin>
+    <plugin name='gz::sim::systems::JointPositionController' filename='gz-sim-joint-position-controller-system'>
+      <joint_name>module2_gimbal_actuator_joint</joint_name>
+      <sub_topic>servo_2</sub_topic>
+    </plugin>
+    <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+      <jointName>module2_actuator_prop1_joint</jointName>
+      <linkName>module2_prop1_link</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>1500</maxRotVelocity>
+      <motorConstant>2e-05</motorConstant>
+      <momentConstant>0.06</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>1</motorNumber>
+      <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin name='gz::sim::systems::JointPositionController' filename='gz-sim-joint-position-controller-system'>
+      <joint_name>module3_body_gimbal_joint</joint_name>
+      <sub_topic>servo_5</sub_topic>
+    </plugin>
+    <plugin name='gz::sim::systems::JointPositionController' filename='gz-sim-joint-position-controller-system'>
+      <joint_name>module3_gimbal_actuator_joint</joint_name>
+      <sub_topic>servo_4</sub_topic>
+    </plugin>
+    <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+      <jointName>module3_actuator_prop1_joint</jointName>
+      <linkName>module3_prop1_link</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>1500</maxRotVelocity>
+      <motorConstant>2e-05</motorConstant>
+      <momentConstant>0.06</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>2</motorNumber>
+      <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin name='gz::sim::systems::JointPositionController' filename='gz-sim-joint-position-controller-system'>
+      <joint_name>module4_body_gimbal_joint</joint_name>
+      <sub_topic>servo_7</sub_topic>
+    </plugin>
+    <plugin name='gz::sim::systems::JointPositionController' filename='gz-sim-joint-position-controller-system'>
+      <joint_name>module4_gimbal_actuator_joint</joint_name>
+      <sub_topic>servo_6</sub_topic>
+    </plugin>
+    <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+      <jointName>module4_actuator_prop1_joint</jointName>
+      <linkName>module4_prop1_link</linkName>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>1500</maxRotVelocity>
+      <motorConstant>2e-05</motorConstant>
+      <momentConstant>0.06</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>3</motorNumber>
+      <rotorDragCoefficient>0.000106428</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <frame name='imu_sensor_joint' attached_to='base_link'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='imu_sensor_link' attached_to='imu_sensor_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='rigid_base_link_module1_body_link' attached_to='base_link'>
+      <pose>0.16750000000000001 0.1825 -0.02 0 0 0</pose>
+    </frame>
+    <frame name='module1_body_link' attached_to='rigid_base_link_module1_body_link'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='rigid_base_link_module2_body_link' attached_to='base_link'>
+      <pose>0.16750000000000001 -0.17199999999999999 -0.02 0 0 0</pose>
+    </frame>
+    <frame name='module2_body_link' attached_to='rigid_base_link_module2_body_link'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='rigid_base_link_module3_body_link' attached_to='base_link'>
+      <pose>-0.14999999999999999 0.1825 -0.02 0 0 0</pose>
+    </frame>
+    <frame name='module3_body_link' attached_to='rigid_base_link_module3_body_link'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='rigid_base_link_module4_body_link' attached_to='base_link'>
+      <pose>-0.14999999999999999 -0.17499999999999999 -0.02 0 0 0</pose>
+    </frame>
+    <frame name='module4_body_link' attached_to='rigid_base_link_module4_body_link'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+  </model>
+</sdf>
