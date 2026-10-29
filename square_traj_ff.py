@@ -19,8 +19,11 @@ yaw 朝向當前邊的前進方向，同時送出位置 + 速度 + 加速度前�
 
 ■ 方形軌跡（NED，以路徑中心 (cn, ce) 為中心，邊長 L，S = L/2；頂點順序與 MAVROS 版相同）
   CCW：SE → NE → NW → SW → SE      CW：SE → SW → NW → NE → SE（由上往下看）
-  每邊為最小 jerk 曲線 s(u) = 10u³ − 15u⁴ + 6u⁵（頂點處速度、加速度為 0），
-  峰值速度 = SEG_PEAK_SPEED_MPS，每邊時間 T = 1.875 × L / 峰值速度。
+  每邊的速度曲線由 SEG_PROFILE 選擇（頂點處速度、加速度皆為 0）：
+    'cruise'  ：等速巡航 CRUISE_SPEED_MPS，前後各 CRUISE_RAMP_S 秒 smoothstep 加減速
+                v(t) = V·(3u² − 2u³)（u = t/CRUISE_RAMP_S），每邊時間 T = L/V + CRUISE_RAMP_S
+    'minjerk' ：最小 jerk 曲線 s(u) = 10u³ − 15u⁴ + 6u⁵（鐘形速度，峰值 SEG_PEAK_SPEED_MPS）
+                每邊時間 T = 1.875 × L / 峰值速度
   頂點：先以最小 jerk 曲線轉 90°（峰值角速度 VERTEX_YAW_RATE_DPS），
         再停 YAW_SETTLE_S 讓 yaw 穩定，才出發下一邊。
 
@@ -42,7 +45,10 @@ from pymavlink import mavutil
 # ─────────────────────────────────────────────────────────────
 TARGET_ALT_M        = 0.8    # 飛行高度 (m)，光流室內建議 0.5~1.0 m
 SQUARE_SIDE_M       = 1.0    # 方形邊長 (m)
-SEG_PEAK_SPEED_MPS  = 0.3    # 每邊最小 jerk 曲線的峰值速度 (m/s)
+SEG_PROFILE         = 'cruise'  # 'cruise': 等速巡航；'minjerk': 鐘形速度（峰值 SEG_PEAK_SPEED_MPS）
+CRUISE_SPEED_MPS    = 0.1    # 'cruise' 的等速段速度 (m/s)
+CRUISE_RAMP_S       = 1.5    # 'cruise' 起步加速 / 到點減速時間 (s)；位移各 = V·RAMP/2
+SEG_PEAK_SPEED_MPS  = 0.3    # 'minjerk' 的峰值速度 (m/s)；也用於中心 ↔ 頂點的移動
 NUM_LAPS            = 2      # 完整方形圈數
 CLOCKWISE           = False  # False: 逆時針 (CCW); True: 順時針 (CW)，由上往下看
 YAW_TRACK_PATH      = True   # True: yaw 追蹤前進方向；False: 維持起飛時的航向
@@ -75,7 +81,18 @@ MIN_JERK_PEAK     = 1.875  # 最小 jerk 曲線：峰值速度 = 1.875 × L / T
 # 遙測串流 (msg id → Hz)：LOCAL_POSITION_NED 5 Hz、ATTITUDE 5 Hz（數傳頻寬有限，維持低頻）
 _STREAMS_HZ = {32: 5.0, 30: 5.0}
 
-_SEG_DUR_S = MIN_JERK_PEAK * SQUARE_SIDE_M / SEG_PEAK_SPEED_MPS     # 每邊飛行時間
+if SEG_PROFILE == 'cruise':
+    if CRUISE_SPEED_MPS * CRUISE_RAMP_S > SQUARE_SIDE_M:
+        sys.exit("  ERROR: CRUISE_SPEED_MPS × CRUISE_RAMP_S 大於邊長，沒有等速段")
+    _SEG_DUR_S = SQUARE_SIDE_M / CRUISE_SPEED_MPS + CRUISE_RAMP_S   # 每邊飛行時間
+    _SEG_VMAX  = CRUISE_SPEED_MPS
+    _SEG_AMAX  = 1.5 * CRUISE_SPEED_MPS / CRUISE_RAMP_S              # smoothstep 加速度峰值
+elif SEG_PROFILE == 'minjerk':
+    _SEG_DUR_S = MIN_JERK_PEAK * SQUARE_SIDE_M / SEG_PEAK_SPEED_MPS
+    _SEG_VMAX  = SEG_PEAK_SPEED_MPS
+    _SEG_AMAX  = 5.7735 * SQUARE_SIDE_M / _SEG_DUR_S ** 2
+else:
+    sys.exit(f"  ERROR: SEG_PROFILE 必須是 'cruise' 或 'minjerk'（目前 {SEG_PROFILE!r}）")
 _TURN_S    = (max(YAW_MIN_TURN_S, MIN_JERK_PEAK * (math.pi / 2) / math.radians(VERTEX_YAW_RATE_DPS))
               if YAW_TRACK_PATH else 0.0)                           # 頂點 90° 轉向時間
 _LAP_DUR_S = 4 * (_SEG_DUR_S + _TURN_S + YAW_SETTLE_S)              # 每圈總時間
@@ -403,6 +420,48 @@ def line_segment(p0, p1, T, yaw):
     return fn
 
 
+def ramp_time(t, path_dur, ramp):
+    """時間扭曲 τ(t)：τ̇ 在前後 ramp 秒內以 smoothstep 3u²−2u³ 平滑 0↔1，中段 τ̇ = 1。
+
+    回傳 (τ, τ̇, τ̈)；τ ∈ [0, path_dur]，總時間 = path_dur + ramp。
+    """
+    total = path_dur + ramp
+    if t <= 0.0:
+        return 0.0, 0.0, 0.0
+    if t >= total:
+        return path_dur, 0.0, 0.0
+    if t < ramp:
+        u = t / ramp
+        return ramp * u**3 * (1.0 - 0.5 * u), u * u * (3.0 - 2.0 * u), 6.0 * u * (1.0 - u) / ramp
+    if t > total - ramp:
+        r = (total - t) / ramp
+        return path_dur - ramp * r**3 * (1.0 - 0.5 * r), r * r * (3.0 - 2.0 * r), -6.0 * r * (1.0 - r) / ramp
+    return t - 0.5 * ramp, 1.0, 0.0
+
+
+def cruise_segment(p0, p1, V, ramp, yaw):
+    """p0 → p1 等速 V 直線段，前後 ramp 秒 smoothstep 加減速；總時間 = L/V + ramp。"""
+    d = tuple(b - a for a, b in zip(p0, p1))
+    L = math.sqrt(sum(k * k for k in d))
+    u = tuple(k / L for k in d)
+    path_dur = L / V
+
+    def fn(t):
+        tau, td, tdd = ramp_time(t, path_dur, ramp)
+        s = V * tau
+        return (tuple(a + s * k for a, k in zip(p0, u)),
+                tuple(V * td * k for k in u),
+                tuple(V * tdd * k for k in u),
+                yaw)
+    return fn
+
+
+def side_segment(p0, p1, yaw):
+    """方形一邊（依 SEG_PROFILE）。"""
+    if SEG_PROFILE == 'cruise':
+        return cruise_segment(p0, p1, CRUISE_SPEED_MPS, CRUISE_RAMP_S, yaw)
+    return line_segment(p0, p1, _SEG_DUR_S, yaw)
+
 def vertex_turn(p, yaw0, yaw1, title):
     """頂點：最小 jerk 轉向（峰值 VERTEX_YAW_RATE_DPS）→ 停 YAW_SETTLE_S。"""
     d = abs(wrap_pi(yaw1 - yaw0))
@@ -412,12 +471,14 @@ def vertex_turn(p, yaw0, yaw1, title):
     turn_and_hold(p, yaw1, yaw1, YAW_SETTLE_S, title + " settle")
 
 
-print(f"  Square (feedforward: p + v + a): side {SQUARE_SIDE_M:.2f} m, peak {SEG_PEAK_SPEED_MPS:.2f} m/s "
+_prof = (f"cruise {CRUISE_SPEED_MPS:.2f} m/s (ramp {CRUISE_RAMP_S:.1f} s)" if SEG_PROFILE == 'cruise'
+         else f"min-jerk peak {SEG_PEAK_SPEED_MPS:.2f} m/s")
+print(f"  Square (feedforward: p + v + a): side {SQUARE_SIDE_M:.2f} m, {_prof} "
       f"→ {_SEG_DUR_S:.1f} s/side, {'CW' if CLOCKWISE else 'CCW'}")
 print(f"    Vertex: turn {_TURN_S:.1f} s + settle {YAW_SETTLE_S:.1f} s, "
       f"{NUM_LAPS} laps ≈ {NUM_LAPS * _LAP_DUR_S:.0f} s")
-print(f"    Peak acceleration ≈ {5.7735 * SQUARE_SIDE_M / _SEG_DUR_S ** 2:.2f} m/s²")
-warn_speed(SEG_PEAK_SPEED_MPS, "square")
+print(f"    Peak acceleration ≈ {_SEG_AMAX:.2f} m/s²")
+warn_speed(max(_SEG_VMAX, SEG_PEAK_SPEED_MPS), "square")
 
 # ─────────────────────────────────────────────────────────────
 # Step 0 – PFA 姿態參數歸零、讀取起飛緩升參數
@@ -567,7 +628,7 @@ try:
             src_i, dst_i = seg, (seg + 1) % 4
             yaw      = seg_yaw(src_i, dst_i)
             next_yaw = seg_yaw(dst_i, (dst_i + 1) % 4)
-            run_trajectory(line_segment(vert3(src_i), vert3(dst_i), _SEG_DUR_S, yaw), _SEG_DUR_S,
+            run_trajectory(side_segment(vert3(src_i), vert3(dst_i), yaw), _SEG_DUR_S,
                            f"Side {seg + 1}/4  {labels[src_i]} → {labels[dst_i]}  yaw={math.degrees(yaw):.0f}°")
             last = (lap == NUM_LAPS - 1 and seg == 3)
             if last:
