@@ -2,7 +2,7 @@
 """
 PFA Heart Trajectory with Feedforward (pymavlink)
 ==================================================
-繞愛心軌跡飛行，roll = pitch = 0°，yaw 全程固定為起飛航向（全向平移），
+繞愛心軌跡飛行，roll = pitch = 0°，yaw 可固定或跟著路線轉（YAW_TRACK_PATH），
 同時送出位置 + 速度 + 加速度前饋。
 
 ■ 與 MAVROS 版的差異
@@ -24,6 +24,13 @@ PFA Heart Trajectory with Feedforward (pymavlink)
   （速度必須為 0），所以一圈分成右半與左半兩段：
     凹處 → 右半邊 → 尖端（停 CORNER_DWELL_S）→ 左半邊 → 凹處（停）
   CLOCKWISE = False 時反向（先左半邊）。
+
+■ 機頭方向 YAW_TRACK_PATH
+  False：yaw 全程固定為起飛航向（全向平移，最乾淨）
+  True ：機頭沿路線切線方向（只支援 PLANE = 'horizontal'）
+         - 曲線上 yaw 角速度 = v·|κ|，另外限制 v ≤ YAW_RATE_MAX_DPS / |κ|
+         - 凹處、尖端切線方向不連續：停下後以最小 jerk 曲線轉向（峰值 YAW_PEAK_RATE_DPS），
+           再停 YAW_SETTLE_S 才出發；起點先轉到起始切線方向，結束後在中心轉回起飛航向
 
 ■ 速度曲線（與 pfa_hershey_ff.py 相同）
   v ≤ V_MAX_MPS，且 v ≤ √(A_LAT_MAX / |κ|)（彎越急越慢），
@@ -65,6 +72,9 @@ V_MAX_MPS      = 0.3     # 最高速度 (m/s)
 A_LAT_MAX      = 0.3     # 向心加速度上限 (m/s²)：決定彎道速度
 A_TAN_MAX      = 0.3     # 切向加速度上限 (m/s²)
 CORNER_DWELL_S = 1.0     # 尖點（凹處、尖端）停留時間 (s)
+YAW_TRACK_PATH = False   # True: 機頭沿切線方向（只支援 horizontal）；False: 固定起飛航向
+YAW_RATE_MAX_DPS = 60.0  # YAW_TRACK_PATH 時曲線上的 yaw 角速度上限 (°/s) → v ≤ ω/|κ|
+YAW_SETTLE_S   = 1.0     # YAW_TRACK_PATH 時尖點轉向完成後再停留的時間 (s)
 APPROACH_PEAK_MPS = 0.3  # 中心 ↔ 起點的最小 jerk 峰值速度 (m/s)
 SMOOTH_M       = 0.01    # 取樣平滑尺度 (m)（解析曲線本身已平滑）
 TRANSIT_SPEED_MPS = 0.2  # （未使用；SampledPiece 需要）
@@ -196,7 +206,7 @@ class SampledPiece:
             vmax, alat, atan = TRANSIT_SPEED_MPS, 1e9, 1.5 * TRANSIT_SPEED_MPS / RAMP_S
         else:
             vmax, alat, atan = V_MAX_MPS, A_LAT_MAX, A_TAN_MAX
-        v = [min(vmax, math.sqrt(alat / max(math.hypot(*k), 1e-9))) for k in self.kv]
+        v = [min(vmax, math.sqrt(alat / max(math.hypot(*k), 1e-9)), _extra_vlim(k)) for k in self.kv]
         v[0] = v[-1] = 0.0
         for i in range(1, n):
             v[i] = min(v[i], math.sqrt(v[i - 1] ** 2 + 2 * atan * (self.s[i] - self.s[i - 1])))
@@ -215,6 +225,25 @@ class SampledPiece:
 
     def end(self):
         return self.p[-1]
+
+    def heading_dir(self, t):
+        """t 秒時路線的單位切線（2D，幾何切線，與速度大小無關）。"""
+        t = min(max(t, 0.0), self.T)
+        i = max(0, min(len(self.t) - 2, bisect.bisect_right(self.t, t) - 1))
+        w = (t - self.t[i]) / max(self.t[i + 1] - self.t[i], 1e-9)
+        return (self.tg[i][0] + (self.tg[i + 1][0] - self.tg[i][0]) * w,
+                self.tg[i][1] + (self.tg[i + 1][1] - self.tg[i][1]) * w)
+
+    def start_dir(self):
+        """起點附近 3 cm 的方向（尖點處的幾何切線不穩定）。"""
+        a, b = self.p[0], self.p[min(3, len(self.p) - 1)]
+        d = math.dist(a, b) or 1e-9
+        return ((b[0] - a[0]) / d, (b[1] - a[1]) / d)
+
+    def end_dir(self):
+        a, b = self.p[max(0, len(self.p) - 4)], self.p[-1]
+        d = math.dist(a, b) or 1e-9
+        return ((b[0] - a[0]) / d, (b[1] - a[1]) / d)
 
     def state2d(self, t):
         t = min(max(t, 0.0), self.T)
@@ -251,6 +280,17 @@ def heart_halves():
 
 if PLANE not in ('horizontal', 'vertical'):
     sys.exit(f"  ERROR: PLANE 必須是 'horizontal' 或 'vertical'（目前 {PLANE!r}）")
+if YAW_TRACK_PATH and PLANE != 'horizontal':
+    sys.exit("  ERROR: YAW_TRACK_PATH 只支援 PLANE = 'horizontal'（垂直面的切線含上下方向）")
+
+
+def _extra_vlim(k):
+    """yaw 跟隨路線時，限制 yaw 角速度 v·|κ| ≤ YAW_RATE_MAX_DPS。"""
+    if not YAW_TRACK_PATH:
+        return float('inf')
+    return math.radians(YAW_RATE_MAX_DPS) / max(math.hypot(*k), 1e-9)
+
+
 _HALVES = [SampledPiece(p, 'draw', name) for name, p in heart_halves()]
 PIECES = []
 for _lap in range(NUM_LAPS):
@@ -268,7 +308,8 @@ def _summary():
     print(f"  Heart on {PLANE} plane: {max(_US) - min(_US):.2f} × {max(_VS) - min(_VS):.2f} m, "
           f"{lap_len:.2f} m/lap, {lap_T:.1f} s/lap, {NUM_LAPS} laps ≈ {_TOTAL_DUR:.0f} s "
           f"({'CW' if CLOCKWISE else 'CCW'})")
-    print(f"    v ≤ {V_MAX_MPS:.2f} m/s, a_lat ≤ {A_LAT_MAX:.2f}, a_tan ≤ {A_TAN_MAX:.2f} m/s²")
+    print(f"    v ≤ {V_MAX_MPS:.2f} m/s, a_lat ≤ {A_LAT_MAX:.2f}, a_tan ≤ {A_TAN_MAX:.2f} m/s²"
+          + (f", yaw follows path (≤ {YAW_RATE_MAX_DPS:.0f}°/s on curves)" if YAW_TRACK_PATH else ", yaw fixed"))
     for p in _HALVES:
         kmax = max(math.hypot(*k) for k in p.kv[5:-5])
         print(f"    {p.label:10s} L={p.L:4.2f} m  vmax={p.V:4.2f} m/s  T={p.T:4.1f} s  "
@@ -680,6 +721,20 @@ warn_speed(max(V_MAX_MPS, APPROACH_PEAK_MPS), "heart")
 if PLANE == 'vertical' and ALT_BOTTOM_M < 0.4:
     print("  WARNING: ALT_BOTTOM_M < 0.4 m，接近地面效應與光流最低高度，建議 ≥ 0.5 m")
 
+
+def dir_yaw(frame, d2):
+    """字母平面的 2D 方向 → NED 航向。"""
+    n, e, _ = vec_ned(frame, d2)
+    return math.atan2(e, n)
+
+
+def piece_fn_track(frame, piece):
+    """同 piece_fn，但 yaw = 路線切線方向。"""
+    def fn(t):
+        p, v, a = piece.state2d(t)
+        return to_ned(frame, p), vec_ned(frame, v), vec_ned(frame, a), dir_yaw(frame, piece.heading_dir(t))
+    return fn
+
 # ─────────────────────────────────────────────────────────────
 # Step 0 – PFA 姿態參數歸零、讀取起飛緩升參數
 # ─────────────────────────────────────────────────────────────
@@ -784,37 +839,55 @@ try:
     cn, ce = hover_p[0], hover_p[1]
     print(f"  Path centre: NED ({cn:.2f}, {ce:.2f}) m")
 
-    yaw    = ground_yaw                     # 全程固定航向（全向平移）
-    frame  = letter_frame(cn, ce, yaw)
-    centre = (cn, ce, -TARGET_ALT_M)
+    frame   = letter_frame(cn, ce, ground_yaw)
+    centre  = (cn, ce, -TARGET_ALT_M)
     p_start = to_ned(frame, PIECES[0].start())
 
-    # ─────────────────────────────────────────────────────────
-    # Step 4 – 中心 → 第一筆起點
-    # ─────────────────────────────────────────────────────────
-    print(f"\n[Step 4] Approach start point N {p_start[0]:.2f} E {p_start[1]:.2f} alt {-p_start[2]:.2f}")
-    T_app = line_duration(centre, p_start, APPROACH_PEAK_MPS, min_dur=3.0)
-    run_trajectory(line_segment(centre, p_start, T_app, yaw), T_app, "centre → start")
-    turn_and_hold(p_start, yaw, yaw, CORNER_DWELL_S, "start dwell (top dent)")
+    def piece_yaws(pc):
+        if not YAW_TRACK_PATH:
+            return ground_yaw, ground_yaw
+        return dir_yaw(frame, pc.start_dir()), dir_yaw(frame, pc.end_dir())
+
+    def cusp_turn(p, yaw0, yaw1, title):
+        """尖點：停 CORNER_DWELL_S；yaw 跟隨時改為最小 jerk 轉向 + YAW_SETTLE_S。"""
+        if YAW_TRACK_PATH and abs(wrap_pi(yaw1 - yaw0)) > 1e-3:
+            turn_and_hold(p, yaw0, yaw1, max(CORNER_DWELL_S, yaw_turn_duration(yaw0, yaw1)),
+                          f"{title}: yaw {math.degrees(yaw0):.0f}° → {math.degrees(yaw1):.0f}°")
+            turn_and_hold(p, yaw1, yaw1, YAW_SETTLE_S, f"{title} settle")
+        else:
+            turn_and_hold(p, yaw1, yaw1, CORNER_DWELL_S, title)
 
     # ─────────────────────────────────────────────────────────
-    # Step 5 – 寫字
+    # Step 4 – 中心 → 起點（上方凹處），轉到起始方向
     # ─────────────────────────────────────────────────────────
-    print(f"\n[Step 5] Heart ({len(PIECES)} pieces, ≈ {_TOTAL_DUR:.0f} s)")
+    print(f"\n[Step 4] Approach start point (top dent) N {p_start[0]:.2f} E {p_start[1]:.2f} alt {-p_start[2]:.2f}")
+    T_app = line_duration(centre, p_start, APPROACH_PEAK_MPS, min_dur=3.0)
+    run_trajectory(line_segment(centre, p_start, T_app, ground_yaw), T_app, "centre → start")
+    yaw = ground_yaw
+    cusp_turn(p_start, yaw, piece_yaws(PIECES[0])[0], "start (top dent)")
+
+    # ─────────────────────────────────────────────────────────
+    # Step 5 – 愛心
+    # ─────────────────────────────────────────────────────────
+    print(f"\n[Step 5] Heart ({len(PIECES)} pieces, ≈ {_TOTAL_DUR:.0f} s, "
+          f"yaw {'follows path' if YAW_TRACK_PATH else 'fixed'})")
     p_end = p_start
     for i, pc in enumerate(PIECES):
-        p_end = run_trajectory(piece_fn(frame, pc, yaw), pc.T,
-                               f"{i + 1}/{len(PIECES)} {pc.label} ({pc.L:.2f} m, vmax {pc.V:.2f} m/s)")[0]
-        turn_and_hold(p_end, yaw, yaw, CORNER_DWELL_S, "dwell")
-    print(f"\n  Heart complete.")
+        fn = piece_fn_track(frame, pc) if YAW_TRACK_PATH else piece_fn(frame, pc, ground_yaw)
+        p_end, _, _, yaw = run_trajectory(fn, pc.T, f"{i + 1}/{len(PIECES)} {pc.label} "
+                                                     f"({pc.L:.2f} m, vmax {pc.V:.2f} m/s)")
+        nxt = piece_yaws(PIECES[i + 1])[0] if i + 1 < len(PIECES) else yaw
+        cusp_turn(p_end, yaw, nxt, "top dent" if pc.label == PIECES[-1].label else "bottom tip")
+    print("\n  Heart complete.")
 
     # ─────────────────────────────────────────────────────────
-    # Step 6 – 回到中心保持
+    # Step 6 – 回到中心，轉回起飛航向並保持
     # ─────────────────────────────────────────────────────────
     print("\n[Step 6] Returning to centre...")
     T_ret = line_duration(p_end, centre, APPROACH_PEAK_MPS, min_dur=3.0)
     run_trajectory(line_segment(p_end, centre, T_ret, yaw), T_ret, "end → centre")
-    turn_and_hold(centre, yaw, yaw, 5.0, "centre hold")
+    turn_and_hold(centre, yaw, ground_yaw, max(5.0, yaw_turn_duration(yaw, ground_yaw)),
+                  "centre hold, yaw → takeoff heading")
 
 except Aborted as e:
     print(f"\n  ✗ Aborted: {e} → 不再切換模式，交給飛手 / failsafe。")
