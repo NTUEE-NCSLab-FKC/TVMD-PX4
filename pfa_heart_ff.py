@@ -32,13 +32,17 @@ PFA Heart Trajectory with Feedforward (pymavlink)
          - 凹處、尖端切線方向不連續：停下後以最小 jerk 曲線轉向（峰值 YAW_PEAK_RATE_DPS），
            再停 YAW_SETTLE_S 才出發；起點先轉到起始切線方向，結束後在中心轉回起飛航向
 
+■ 愛心的「上」HEART_UP_DEG（PLANE = 'horizontal'）
+  None：起飛時的機頭方向；數字：NED 航向角（0 = 北、90 = 東、180 = 南、−90 = 西）
+  注意：EKF2_MAG_TYPE = 5（不用磁力計）時，EKF 的「北」= 開機時機頭的方向，不是真北。
+
 ■ 速度曲線（與 pfa_hershey_ff.py 相同）
   v ≤ V_MAX_MPS，且 v ≤ √(A_LAT_MAX / |κ|)（彎越急越慢），
   前後各掃一次套上切向加速度上限 A_TAN_MAX；每段起停速度為 0。
   前饋：v = T·v(s)，a = T·v·dv/ds + κ·v²（含向心加速度）。
 
 ■ 書寫平面 PLANE
-  'horizontal'：TARGET_ALT_M 高度的水平面（俯視；愛心的「上」= 起飛時機頭方向）
+  'horizontal'：TARGET_ALT_M 高度的水平面（俯視；愛心的「上」由 HEART_UP_DEG 決定）
   'vertical'  ：垂直面（站在飛機後方看；尖端高度 = ALT_BOTTOM_M）
 
 ■ 預覽（不連線、不起飛）
@@ -66,6 +70,7 @@ PLANE          = 'horizontal'   # 'horizontal'：水平面；'vertical'：垂直
 TARGET_ALT_M   = 1.0     # 懸停高度 (m)；horizontal 時也是飛行高度
 ALT_BOTTOM_M   = 0.6     # vertical 時愛心尖端的高度 (m)
 HEART_WIDTH_M  = 1.6     # 愛心寬度 (m)；高度約 0.92 × 寬度
+HEART_UP_DEG   = 0.0     # horizontal 時愛心「上方」的 NED 航向 (°)：0 = 北；None = 起飛時機頭方向
 NUM_LAPS       = 2       # 圈數
 CLOCKWISE      = True    # True: 凹處 → 右半邊 → 尖端 → 左半邊；False: 反向
 V_MAX_MPS      = 0.3     # 最高速度 (m/s)
@@ -839,7 +844,11 @@ try:
     cn, ce = hover_p[0], hover_p[1]
     print(f"  Path centre: NED ({cn:.2f}, {ce:.2f}) m")
 
-    frame   = letter_frame(cn, ce, ground_yaw)
+    up_yaw  = ground_yaw if (HEART_UP_DEG is None or PLANE != 'horizontal') else math.radians(HEART_UP_DEG)
+    frame   = letter_frame(cn, ce, up_yaw)          # 愛心方向（與機頭方向無關）
+    if PLANE == 'horizontal':
+        print(f"  Heart 'up' = NED heading {math.degrees(up_yaw):.0f}°"
+              + (" (takeoff heading)" if HEART_UP_DEG is None else ""))
     centre  = (cn, ce, -TARGET_ALT_M)
     p_start = to_ned(frame, PIECES[0].start())
 
