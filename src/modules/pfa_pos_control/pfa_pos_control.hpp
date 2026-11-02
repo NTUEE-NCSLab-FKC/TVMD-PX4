@@ -157,6 +157,12 @@ private:
 	float _dt{0.004f};			/**< loop interval of the current cycle (s) */
 	float _yield_angle{0.0f};		/**< attitude yield currently applied (rad, rate limited) */
 	matrix::Vector3f _yield_axis{1.0f, 0.0f, 0.0f};	/**< last valid yield rotation axis (NED) */
+	float _yield_angle2{0.0f};		/**< drift-stage yield currently applied (rad) */
+	matrix::Vector3f _yield_axis2{1.0f, 0.0f, 0.0f};	/**< last valid drift-stage rotation axis (NED) */
+	matrix::Vector3f _yield_force_lp{};	/**< low-passed desired force for the drift stage */
+	bool _yield_force_lp_valid{false};
+	static constexpr float YIELD_FORCE_TAU = 0.3f;	/**< time constant of _yield_force_lp (s) */
+	static constexpr float YIELD_DRIFT_MARGIN_DEG = 15.f;	/**< drift stage: force beyond servo range + this */
 
 	float _pos_yaw_sp{0.0f};		/**< yaw setpoint of the position branch (integrated from yawspeed when yaw is NaN) */
 	bool  _pos_yaw_valid{false};
@@ -229,7 +235,7 @@ private:
 	 * Rotate the commanded attitude towards the desired force so that the force
 	 * lies inside the thrust cone (PFA_YIELD_TILT). Returns roll, pitch, yaw.
 	 */
-	matrix::Vector3f attitude_yield(const matrix::Vector3f &force_ned,
+	matrix::Vector3f attitude_yield(const matrix::Vector3f &force_nominal, const matrix::Vector3f &force_ned,
 					const matrix::Vector3f &euler_des, float dt);
 
 	/** Servo range (rad) used for the body x/y thrust cone. */

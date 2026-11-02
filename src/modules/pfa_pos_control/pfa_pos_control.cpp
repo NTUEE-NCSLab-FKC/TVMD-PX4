@@ -184,7 +184,9 @@ void PFAPOSControl::pose_controller_6dof(
 	// Attitude yield (PFA_ATT_YIELD): if the commanded attitude cannot deliver the
 	// desired force (force outside the thrust cone), tilt the attitude setpoint
 	// towards the force until it fits, instead of letting the position run away.
-	const Vector3f euler_cmd = attitude_yield(control_normalized_force, euler_attitude_des, _dt);
+	const Vector3f nominal_force = (err_acc + resist_gravity) * _param_vehicle_mass.get()
+				       / _param_vehicle_max_thrust.get();
+	const Vector3f euler_cmd = attitude_yield(nominal_force, control_normalized_force, euler_attitude_des, _dt);
 
 	// Rotate the thrust from global to body frame
 	const Vector3f rotated_input = q_att.rotateVectorInverse(control_normalized_force);
@@ -282,76 +284,104 @@ float PFAPOSControl::servo_tilt_max() const
 /**
  * Attitude yield.
  *
- * The thrust of the commanded attitude R_d points along t_d = R_d * (0, 0, -1). The
- * servos can only tilt it by a limited angle, so a desired force F more than sigma
- * (PFA_YIELD_TILT) away from t_d cannot be produced. In that case the attitude is
- * rotated about n = t_d x F (world frame) by phi = theta - sigma, the smallest
- * rotation that puts F on the cone boundary. phi grows immediately and shrinks at
- * most at PFA_YIELD_RATE. roll / pitch are then solved so that the thrust axis matches the
- * rotated one with the commanded yaw unchanged.
+ * The thrust of the commanded attitude R_d points along t_d = R_d * (0, 0, -1).
+ * Stage 1: if the nominal force (gravity + acceleration feedforward) is more than sigma
+ * (PFA_YIELD_TILT) away from t_d, the commanded tilt is not feasible; rotate about
+ * t_d x F by theta - sigma (closed form, smallest rotation) so the force sits on the cone.
+ * Stage 2: if the low-passed full force (incl. position feedback) is still more than the
+ * servo range + YIELD_DRIFT_MARGIN_DEG away from that attitude, the vehicle is being pushed
+ * away: lean further into the force, capped at MPC_TILTMAX_AIR.
+ * Both angles grow immediately and shrink at most at PFA_YIELD_RATE. roll / pitch are
+ * then solved so that the thrust axis matches the rotated one with the commanded yaw.
  */
-Vector3f PFAPOSControl::attitude_yield(const Vector3f &force_ned, const Vector3f &euler_des, float dt)
+Vector3f PFAPOSControl::attitude_yield(const Vector3f &force_nominal, const Vector3f &force_ned,
+				       const Vector3f &euler_des, float dt)
 {
-	const float sigma = math::radians(_param_yield_tilt.get());
 	const Dcmf R_d{Eulerf(euler_des(0), euler_des(1), euler_des(2))};
 	const Vector3f t_d = R_d * Vector3f(0.f, 0.f, -1.f);
 	const float hover_norm = CONSTANTS_ONE_G * _param_vehicle_mass.get() / _param_vehicle_max_thrust.get();
-	const float f_norm = force_ned.norm();
+	const float step = math::radians(_param_yield_rate.get()) * dt;
 
-	float theta = 0.f;
-	bool valid = (_param_att_yield.get() > 0) && PX4_ISFINITE(f_norm) && (f_norm > 0.3f * hover_norm);
+	// Low-passed full force (incl. position / velocity feedback) for the drift stage
+	if (!_yield_force_lp_valid || !_yield_force_lp.isAllFinite()) {
+		_yield_force_lp = force_ned;
+		_yield_force_lp_valid = true;
 
-	if (valid) {
-		const Vector3f f_hat = force_ned / f_norm;
-		const Vector3f n = t_d.cross(f_hat);
-		theta = atan2f(n.norm(), t_d.dot(f_hat));	// accurate also near 0 (acosf is not)
-
-		// A force far from the thrust axis (theta > 90 deg) is exactly the case where the
-		// vehicle is being pushed away (e.g. a large commanded tilt): keep yielding. Only a
-		// commanded attitude that is itself beyond 90 deg (flip manoeuvres) is left alone.
-		valid = (t_d(2) < 0.f);
-
-		if (valid && n.norm() > 1e-6f) {
-			_yield_axis = n.normalized();
-		}
+	} else {
+		const float alpha = math::constrain(dt / (YIELD_FORCE_TAU + dt), 0.f, 1.f);
+		_yield_force_lp += (force_ned - _yield_force_lp) * alpha;
 	}
 
-	// Growing the yield is immediate (a commanded tilt step is followed by the attitude
-	// loop within a few 100 ms, a slower yield arrives too late); only the recovery
-	// towards the commanded attitude is rate limited (PFA_YIELD_RATE).
-	const float target = valid ? math::max(theta - sigma, 0.f) : 0.f;
-	const float step = math::radians(_param_yield_rate.get()) * dt;
-	_yield_angle = (target >= _yield_angle) ? target : math::max(target, _yield_angle - step);
-	_yield_angle = math::constrain(_yield_angle, 0.f, M_PI_F);
+	// angle between thrust axis t and force f (axis updated only if well defined)
+	const auto angle_to = [&](const Vector3f &t, const Vector3f &f, Vector3f &axis) {
+		const float fn = f.norm();
 
-	if (_yield_angle < 1e-4f) {
+		if (!PX4_ISFINITE(fn) || fn < 0.3f * hover_norm) {
+			return 0.f;
+		}
+
+		const Vector3f n = t.cross(f / fn);
+
+		if (n.norm() > 1e-6f) {
+			axis = n.normalized();
+		}
+
+		return atan2f(n.norm(), t.dot(f / fn));	// accurate also near 0 (acosf is not)
+	};
+
+	// Growing a yield is immediate (a commanded tilt step is followed by the attitude loop
+	// within a few 100 ms, a slower yield arrives too late); only the recovery towards the
+	// commanded attitude is rate limited (PFA_YIELD_RATE).
+	const auto update = [&](float &angle, float target) {
+		angle = (target >= angle) ? target : math::max(target, angle - step);
+		angle = math::constrain(angle, 0.f, M_PI_F);
+	};
+
+	// Only a commanded attitude that is itself upside down (flip manoeuvres) is left alone.
+	const bool valid = (_param_att_yield.get() > 0) && (t_d(2) < 0.f);
+
+	// Stage 1 - feasibility of the commanded attitude: nominal force (gravity + acceleration
+	// feedforward) outside the PFA_YIELD_TILT cone. The position feedback is deliberately not
+	// used here: attitude -> position error -> force -> yield -> attitude is a loop, and with the
+	// full force the setpoint swung between ~6 and ~43 deg in SITL (Kp 50 / Kd 25).
+	const float theta1 = valid ? angle_to(t_d, force_nominal, _yield_axis) : 0.f;
+	update(_yield_angle, valid ? math::max(theta1 - math::radians(_param_yield_tilt.get()), 0.f) : 0.f);
+	const float phi1 = valid ? math::min(_yield_angle, theta1) : _yield_angle;	// never past the force
+	const Vector3f t_1 = Dcmf(matrix::AxisAnglef(_yield_axis, phi1)) * t_d;
+
+	// Stage 2 - drift: the (low-passed) full force is far outside even the servo range of the
+	// stage-1 attitude, i.e. the vehicle is being pushed away (large error, a tilt the yield
+	// came too late for). Lean into it like a multicopter. The margin keeps normal position
+	// corrections (which the servos absorb or which only clip briefly) out of this stage.
+	const float theta2 = valid ? angle_to(t_1, _yield_force_lp, _yield_axis2) : 0.f;
+	const float drift_threshold = servo_tilt_max() + math::radians(YIELD_DRIFT_MARGIN_DEG);
+	update(_yield_angle2, valid ? math::max(theta2 - drift_threshold, 0.f) : 0.f);
+	float phi2 = valid ? math::min(_yield_angle2, theta2) : _yield_angle2;
+
+	if (phi1 < 1e-4f && phi2 < 1e-4f) {
 		return euler_des;
 	}
 
-	// rotated thrust axis (never past the force direction)
-	float phi = valid ? math::min(_yield_angle, theta) : _yield_angle;
-
-	// Tilt cap: a large position error asks for a large force angle, and like a multicopter
-	// the vehicle must not tilt further than MPC_TILTMAX_AIR because of it (a commanded
-	// tilt above that is kept). The rest of the demand is then clipped by the thrust cone.
+	// Tilt cap on stage 2: like a multicopter, do not lean further than MPC_TILTMAX_AIR
+	// because of position errors (a commanded tilt above that is not increased either).
 	const auto tilt_of = [&](float a) {
-		const Vector3f t = Dcmf(matrix::AxisAnglef(_yield_axis, a)) * t_d;
+		const Vector3f t = Dcmf(matrix::AxisAnglef(_yield_axis2, a)) * t_1;
 		return acosf(math::constrain(-t(2), -1.f, 1.f));
 	};
 	const float tilt_cap = math::max(math::radians(_param_mpc_tiltmax_air.get()), tilt_of(0.f));
 
-	if (tilt_of(phi) > tilt_cap) {
-		float lo = 0.f, hi = phi;
+	if (phi2 > 0.f && tilt_of(phi2) > tilt_cap) {
+		float lo = 0.f, hi = phi2;
 
 		for (int i = 0; i < 16; i++) {
 			const float mid = 0.5f * (lo + hi);
 			(tilt_of(mid) > tilt_cap ? hi : lo) = mid;
 		}
 
-		phi = lo;
+		phi2 = lo;
 	}
 
-	const Vector3f t_y = Dcmf(matrix::AxisAnglef(_yield_axis, phi)) * t_d;
+	const Vector3f t_y = Dcmf(matrix::AxisAnglef(_yield_axis2, phi2)) * t_1;
 
 	// roll / pitch for the commanded yaw: in the yaw frame the body z axis of
 	// R = Rz(yaw) Ry(pitch) Rx(roll) is (cos(roll) sin(pitch), -sin(roll), cos(roll) cos(pitch))

@@ -185,9 +185,12 @@ PARAM_DEFINE_FLOAT(PFA_FUP_MIN, 0.6f);
  * The body can only tilt its thrust by the servo range (CA_SV_TL0/1_MAXA)
  * relative to the body z axis. When the commanded attitude (PFA_DES_ROLL /
  * PFA_DES_PITCH, or level) would need a body-frame horizontal force outside
- * the cone of half angle PFA_YIELD_TILT around the thrust axis, the attitude
- * setpoint is rotated towards the desired force (closed form, smallest
- * rotation, yaw kept) until the force lies on the cone boundary. Position is
+ * the cone of half angle PFA_YIELD_TILT around the thrust axis (judged with the
+ * nominal force: gravity + acceleration feedforward), the attitude setpoint is
+ * rotated towards that force (closed form, smallest rotation, yaw kept) until
+ * it lies on the cone boundary. If the vehicle is nevertheless pushed away
+ * (low-passed full force more than the servo range + 15 deg off), it leans
+ * further into the force, up to MPC_TILTMAX_AIR. Position is
  * then kept at the cost of not reaching the commanded tilt. While enabled the
  * body x/y thrust is also limited by a cone, |b_xy| <= tan(servo max) * |b_z|,
  * instead of only the fixed +-0.3 box.
@@ -200,9 +203,12 @@ PARAM_DEFINE_INT32(PFA_ATT_YIELD, 1);
 /**
  * Thrust cone half angle for the attitude yield
  *
- * Largest angle allowed between the desired force and the thrust axis of the
- * commanded attitude. Keep it below the servo range (CA_SV_TL*_MAXA, 30 deg)
- * so that the servos keep some range for the attitude torques.
+ * Largest angle allowed between the nominal force (gravity + acceleration
+ * feedforward) and the thrust axis of the commanded attitude. Keep it below the
+ * servo range (CA_SV_TL*_MAXA, 30 deg) by more than the steady attitude
+ * tracking error (about 5-7 deg without an attitude integrator), so that the
+ * actual attitude stays inside the servo range and the servos keep some range
+ * for the attitude torques.
  *
  * @unit deg
  * @min 5.0
@@ -211,7 +217,7 @@ PARAM_DEFINE_INT32(PFA_ATT_YIELD, 1);
  * @increment 1.0
  * @group PFA Position Control
  */
-PARAM_DEFINE_FLOAT(PFA_YIELD_TILT, 25.0f);
+PARAM_DEFINE_FLOAT(PFA_YIELD_TILT, 20.0f);
 
 /**
  * Recovery rate of the attitude yield
