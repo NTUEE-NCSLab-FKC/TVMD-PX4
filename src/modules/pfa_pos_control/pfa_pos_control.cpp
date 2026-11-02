@@ -127,6 +127,9 @@ void PFAPOSControl::publish_attitude_setpoint(
 	vehicle_attitude_setpoint.pitch_body = euler_attitude_des(1);
 	vehicle_attitude_setpoint.yaw_body = euler_attitude_des(2);
 
+	// q_d is what MAVLink ATTITUDE_TARGET reports; without it GCS / scripts see 0 deg
+	Quatf(Eulerf(euler_attitude_des(0), euler_attitude_des(1), euler_attitude_des(2))).copyTo(vehicle_attitude_setpoint.q_d);
+
 	const Vector3f output_thrust = _checkAllFinite(thrust_sp);
 	output_thrust.copyTo(vehicle_attitude_setpoint.thrust_body);
 	_att_sp_pub.publish(vehicle_attitude_setpoint);
