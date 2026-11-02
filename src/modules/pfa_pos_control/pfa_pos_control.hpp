@@ -154,6 +154,10 @@ private:
 	float _manual_desired_yaw{0.0f};
 	bool  _manual_yaw_initialized{false};
 
+	float _dt{0.004f};			/**< loop interval of the current cycle (s) */
+	float _yield_angle{0.0f};		/**< attitude yield currently applied (rad, rate limited) */
+	matrix::Vector3f _yield_axis{1.0f, 0.0f, 0.0f};	/**< last valid yield rotation axis (NED) */
+
 	float _pos_yaw_sp{0.0f};		/**< yaw setpoint of the position branch (integrated from yawspeed when yaw is NaN) */
 	bool  _pos_yaw_valid{false};
 
@@ -179,6 +183,11 @@ private:
 		(ParamInt<px4::params::PFA_TKF_BYP>)    _param_takeoff_bypass,
 		(ParamInt<px4::params::PFA_VERT_PRIO>)  _param_vert_prio,
 		(ParamFloat<px4::params::PFA_FUP_MIN>)  _param_fup_min,
+		(ParamInt<px4::params::PFA_ATT_YIELD>)    _param_att_yield,
+		(ParamFloat<px4::params::PFA_YIELD_TILT>) _param_yield_tilt,
+		(ParamFloat<px4::params::PFA_YIELD_RATE>) _param_yield_rate,
+		(ParamFloat<px4::params::CA_SV_TL0_MAXA>) _param_servo_x_angle_max,
+		(ParamFloat<px4::params::CA_SV_TL1_MAXA>) _param_servo_y_angle_max,
 
 		(ParamFloat<px4::params::PFA_VEH_MASS>) _param_vehicle_mass,
 		(ParamFloat<px4::params::PFA_MAX_THR>)  _param_vehicle_max_thrust,
@@ -215,6 +224,16 @@ private:
 			const vehicle_local_position_s &vlocal_pos);
 
 	float position_yaw_setpoint(const trajectory_setpoint_s &traj_sp, const float dt);
+
+	/**
+	 * Rotate the commanded attitude towards the desired force so that the force
+	 * lies inside the thrust cone (PFA_YIELD_TILT). Returns roll, pitch, yaw.
+	 */
+	matrix::Vector3f attitude_yield(const matrix::Vector3f &force_ned,
+					const matrix::Vector3f &euler_des, float dt);
+
+	/** Servo range (rad) used for the body x/y thrust cone. */
+	float servo_tilt_max() const;
 
 	void update_hold_setpoint(const bool hold_mode, const vehicle_local_position_s &vlocal_pos);
 

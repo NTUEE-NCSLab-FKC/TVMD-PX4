@@ -178,3 +178,52 @@ PARAM_DEFINE_INT32(PFA_VERT_PRIO, 1);
  * @group PFA Position Control
  */
 PARAM_DEFINE_FLOAT(PFA_FUP_MIN, 0.6f);
+
+/**
+ * Attitude yield when the desired force leaves the thrust cone
+ *
+ * The body can only tilt its thrust by the servo range (CA_SV_TL0/1_MAXA)
+ * relative to the body z axis. When the commanded attitude (PFA_DES_ROLL /
+ * PFA_DES_PITCH, or level) would need a body-frame horizontal force outside
+ * the cone of half angle PFA_YIELD_TILT around the thrust axis, the attitude
+ * setpoint is rotated towards the desired force (closed form, smallest
+ * rotation, yaw kept) until the force lies on the cone boundary. Position is
+ * then kept at the cost of not reaching the commanded tilt. While enabled the
+ * body x/y thrust is also limited by a cone, |b_xy| <= tan(servo max) * |b_z|,
+ * instead of only the fixed +-0.3 box.
+ *
+ * @boolean
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_INT32(PFA_ATT_YIELD, 1);
+
+/**
+ * Thrust cone half angle for the attitude yield
+ *
+ * Largest angle allowed between the desired force and the thrust axis of the
+ * commanded attitude. Keep it below the servo range (CA_SV_TL*_MAXA, 30 deg)
+ * so that the servos keep some range for the attitude torques.
+ *
+ * @unit deg
+ * @min 5.0
+ * @max 40.0
+ * @decimal 1
+ * @increment 1.0
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_FLOAT(PFA_YIELD_TILT, 25.0f);
+
+/**
+ * Maximum rate of the attitude yield
+ *
+ * Rate at which the yield angle may grow (when the force leaves the cone) and
+ * shrink again (when it returns), so the attitude setpoint changes smoothly.
+ *
+ * @unit deg/s
+ * @min 5.0
+ * @max 360.0
+ * @decimal 1
+ * @increment 5.0
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_FLOAT(PFA_YIELD_RATE, 45.0f);

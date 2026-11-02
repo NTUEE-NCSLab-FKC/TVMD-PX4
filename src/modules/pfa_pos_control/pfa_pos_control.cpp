@@ -178,6 +178,11 @@ void PFAPOSControl::pose_controller_6dof(
 	const Vector3f control_force = control_acc * _param_vehicle_mass.get();
 	const Vector3f control_normalized_force = control_force / _param_vehicle_max_thrust.get();
 
+	// Attitude yield (PFA_ATT_YIELD): if the commanded attitude cannot deliver the
+	// desired force (force outside the thrust cone), tilt the attitude setpoint
+	// towards the force until it fits, instead of letting the position run away.
+	const Vector3f euler_cmd = attitude_yield(control_normalized_force, euler_attitude_des, _dt);
+
 	// Rotate the thrust from global to body frame
 	const Vector3f rotated_input = q_att.rotateVectorInverse(control_normalized_force);
 	// const Vector3f rotated_input = control_normalized_force;
@@ -187,6 +192,19 @@ void PFAPOSControl::pose_controller_6dof(
 	Vector3f limited_thrust_des = matrix::constrain(rotated_input,
 		Vector3f(-_thrust_xy_max, -_thrust_xy_max, _thrust_up_max),
 		Vector3f(_thrust_xy_max, _thrust_xy_max, _thrust_min));
+
+	// Thrust cone: the servos can tilt the thrust by at most servo_tilt_max(), so the
+	// body x/y force the allocator can deliver scales with the body z force. Limit the
+	// x/y magnitude (direction kept) to tan(servo max) * |b_z| on top of the fixed box.
+	if (_param_att_yield.get() > 0) {
+		const float xy_cone = tanf(servo_tilt_max()) * fabsf(limited_thrust_des(2));
+		const float xy_norm = matrix::Vector2f(limited_thrust_des(0), limited_thrust_des(1)).norm();
+
+		if (xy_norm > xy_cone && xy_norm > FLT_EPSILON) {
+			limited_thrust_des(0) *= xy_cone / xy_norm;
+			limited_thrust_des(1) *= xy_cone / xy_norm;
+		}
+	}
 
 	// Vertical priority (PFA_VERT_PRIO): the body z computed above assumes the full
 	// body x/y demand is delivered, because part of the world-frame lift comes from
@@ -225,7 +243,7 @@ void PFAPOSControl::pose_controller_6dof(
 		}
 	}
 
-	publish_attitude_setpoint(limited_thrust_des, euler_attitude_des);
+	publish_attitude_setpoint(limited_thrust_des, euler_cmd);
 
 	vehicle_local_position_setpoint_s local_pos_sp{};
 	local_pos_sp.timestamp = hrt_absolute_time();
@@ -241,6 +259,91 @@ void PFAPOSControl::pose_controller_6dof(
 	_local_pos_sp_pub.publish(local_pos_sp);
 }
 
+
+float PFAPOSControl::servo_tilt_max() const
+{
+	const float servo_max = math::min(_param_servo_x_angle_max.get(), _param_servo_y_angle_max.get());
+	return math::radians((servo_max > 1.f && servo_max < 89.f) ? servo_max : 30.f);
+}
+
+/**
+ * Attitude yield.
+ *
+ * The thrust of the commanded attitude R_d points along t_d = R_d * (0, 0, -1). The
+ * servos can only tilt it by a limited angle, so a desired force F more than sigma
+ * (PFA_YIELD_TILT) away from t_d cannot be produced. In that case the attitude is
+ * rotated about n = t_d x F (world frame) by phi = theta - sigma, the smallest
+ * rotation that puts F on the cone boundary. phi is rate limited (PFA_YIELD_RATE) in
+ * both directions. roll / pitch are then solved so that the thrust axis matches the
+ * rotated one with the commanded yaw unchanged.
+ */
+Vector3f PFAPOSControl::attitude_yield(const Vector3f &force_ned, const Vector3f &euler_des, float dt)
+{
+	const float sigma = math::radians(_param_yield_tilt.get());
+	const Dcmf R_d{Eulerf(euler_des(0), euler_des(1), euler_des(2))};
+	const Vector3f t_d = R_d * Vector3f(0.f, 0.f, -1.f);
+	const float hover_norm = CONSTANTS_ONE_G * _param_vehicle_mass.get() / _param_vehicle_max_thrust.get();
+	const float f_norm = force_ned.norm();
+
+	float theta = 0.f;
+	bool valid = (_param_att_yield.get() > 0) && PX4_ISFINITE(f_norm) && (f_norm > 0.3f * hover_norm);
+
+	if (valid) {
+		const Vector3f f_hat = force_ned / f_norm;
+		const Vector3f n = t_d.cross(f_hat);
+		theta = atan2f(n.norm(), t_d.dot(f_hat));	// accurate also near 0 (acosf is not)
+
+		// beyond 90 deg (flip manoeuvres) or degenerate axis: do not interfere
+		valid = (theta < M_PI_2_F);
+
+		if (valid && n.norm() > 1e-6f) {
+			_yield_axis = n.normalized();
+		}
+	}
+
+	const float target = valid ? math::max(theta - sigma, 0.f) : 0.f;
+	const float step = math::radians(_param_yield_rate.get()) * dt;
+	_yield_angle = math::constrain(_yield_angle + math::constrain(target - _yield_angle, -step, step),
+				       0.f, M_PI_2_F);
+
+	if (_yield_angle < 1e-4f) {
+		return euler_des;
+	}
+
+	// rotated thrust axis (never past the force direction)
+	float phi = valid ? math::min(_yield_angle, theta) : _yield_angle;
+
+	// Tilt cap: a large position error asks for a large force angle, and like a multicopter
+	// the vehicle must not tilt further than MPC_TILTMAX_AIR because of it (a commanded
+	// tilt above that is kept). The rest of the demand is then clipped by the thrust cone.
+	const auto tilt_of = [&](float a) {
+		const Vector3f t = Dcmf(matrix::AxisAnglef(_yield_axis, a)) * t_d;
+		return acosf(math::constrain(-t(2), -1.f, 1.f));
+	};
+	const float tilt_cap = math::max(math::radians(_param_mpc_tiltmax_air.get()), tilt_of(0.f));
+
+	if (tilt_of(phi) > tilt_cap) {
+		float lo = 0.f, hi = phi;
+
+		for (int i = 0; i < 16; i++) {
+			const float mid = 0.5f * (lo + hi);
+			(tilt_of(mid) > tilt_cap ? hi : lo) = mid;
+		}
+
+		phi = lo;
+	}
+
+	const Vector3f t_y = Dcmf(matrix::AxisAnglef(_yield_axis, phi)) * t_d;
+
+	// roll / pitch for the commanded yaw: in the yaw frame the body z axis of
+	// R = Rz(yaw) Ry(pitch) Rx(roll) is (cos(roll) sin(pitch), -sin(roll), cos(roll) cos(pitch))
+	const float yaw = euler_des(2);
+	const Vector3f z_b = -(Dcmf(Eulerf(0.f, 0.f, -yaw)) * t_y);
+	const float roll = asinf(math::constrain(-z_b(1), -1.f, 1.f));
+	const float pitch = atan2f(z_b(0), z_b(2));
+
+	return Vector3f(roll, pitch, yaw);
+}
 
 /**
  * Calculate the desired thrust that hovers the vehicle at the current
@@ -367,6 +470,7 @@ void PFAPOSControl::Run()
 		const float dt =
 			math::constrain(((vlocal_pos.timestamp_sample - _time_stamp_last_loop) * 1e-6f), 0.002f, 0.04f);
 		_time_stamp_last_loop = vlocal_pos.timestamp_sample;
+		_dt = dt;
 
 		_vehicle_attitude_sub.update(&_vehicle_attitude);
 		_trajectory_setpoint_sub.update(&_trajectory_setpoint);
