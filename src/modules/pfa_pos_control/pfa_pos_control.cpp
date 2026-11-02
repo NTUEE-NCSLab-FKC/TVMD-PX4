@@ -196,19 +196,6 @@ void PFAPOSControl::pose_controller_6dof(
 		Vector3f(-_thrust_xy_max, -_thrust_xy_max, _thrust_up_max),
 		Vector3f(_thrust_xy_max, _thrust_xy_max, _thrust_min));
 
-	// Thrust cone: the servos can tilt the thrust by at most servo_tilt_max(), so the
-	// body x/y force the allocator can deliver scales with the body z force. Limit the
-	// x/y magnitude (direction kept) to tan(servo max) * |b_z| on top of the fixed box.
-	if (_param_att_yield.get() > 0) {
-		const float xy_cone = tanf(servo_tilt_max()) * fabsf(limited_thrust_des(2));
-		const float xy_norm = matrix::Vector2f(limited_thrust_des(0), limited_thrust_des(1)).norm();
-
-		if (xy_norm > xy_cone && xy_norm > FLT_EPSILON) {
-			limited_thrust_des(0) *= xy_cone / xy_norm;
-			limited_thrust_des(1) *= xy_cone / xy_norm;
-		}
-	}
-
 	// Vertical priority (PFA_VERT_PRIO): the body z computed above assumes the full
 	// body x/y demand is delivered, because part of the world-frame lift comes from
 	// the body x/y components when the vehicle is tilted. If x/y were clipped, that
@@ -216,15 +203,19 @@ void PFAPOSControl::pose_controller_6dof(
 	// clipping keeps growing). Re-solve body z so that the world-frame vertical force
 	// still equals the demand, and accept the horizontal shortfall instead:
 	//   world_z = R(2,0)*bx + R(2,1)*by + R(2,2)*bz  ->  bz = (F_z - R20*bx - R21*by) / R22
-	const bool xy_clipped = fabsf(limited_thrust_des(0) - rotated_input(0)) > FLT_EPSILON
-				|| fabsf(limited_thrust_des(1) - rotated_input(1)) > FLT_EPSILON;
+	bool xy_clipped = fabsf(limited_thrust_des(0) - rotated_input(0)) > FLT_EPSILON
+			  || fabsf(limited_thrust_des(1) - rotated_input(1)) > FLT_EPSILON;
 
 	const Dcmf R(q_att);	// body FRD -> NED
 	const float r22 = R(2, 2);	// cos(roll) * cos(pitch)
 
 	// Both corrections assume the body z axis points mostly up; beyond 60 deg of tilt
 	// (e.g. during a flip) more body lift would mainly push the vehicle sideways.
-	if (xy_clipped && r22 > 0.5f) {
+	const auto vertical_priority = [&]() {
+		if (!xy_clipped || r22 <= 0.5f) {
+			return;
+		}
+
 		if (_param_vert_prio.get() > 0) {
 			const float bz = (control_normalized_force(2)
 					  - R(2, 0) * limited_thrust_des(0)
@@ -243,6 +234,25 @@ void PFAPOSControl::pose_controller_6dof(
 					      / _param_vehicle_max_thrust.get();	// < 0 (NED, up)
 			const float floor_z = math::max(fup_min * hover_z, _thrust_up_max);
 			limited_thrust_des(2) = math::min(limited_thrust_des(2), floor_z);
+		}
+	};
+
+	vertical_priority();
+
+	// Thrust cone: the servos can tilt the thrust by at most servo_tilt_max(), so the
+	// body x/y force the allocator can deliver scales with the body z force. Limit the
+	// x/y magnitude (direction kept) to tan(servo max) * |b_z| on top of the fixed box.
+	// Uses the body z after the vertical priority: when strongly tilted the raw body z
+	// demand can be ~0 (or positive), which would wrongly collapse the x/y force.
+	if (_param_att_yield.get() > 0) {
+		const float xy_cone = tanf(servo_tilt_max()) * fabsf(limited_thrust_des(2));
+		const float xy_norm = matrix::Vector2f(limited_thrust_des(0), limited_thrust_des(1)).norm();
+
+		if (xy_norm > xy_cone && xy_norm > FLT_EPSILON) {
+			limited_thrust_des(0) *= xy_cone / xy_norm;
+			limited_thrust_des(1) *= xy_cone / xy_norm;
+			xy_clipped = true;
+			vertical_priority();	// re-solve body z for the reduced x/y
 		}
 	}
 
@@ -276,8 +286,8 @@ float PFAPOSControl::servo_tilt_max() const
  * servos can only tilt it by a limited angle, so a desired force F more than sigma
  * (PFA_YIELD_TILT) away from t_d cannot be produced. In that case the attitude is
  * rotated about n = t_d x F (world frame) by phi = theta - sigma, the smallest
- * rotation that puts F on the cone boundary. phi is rate limited (PFA_YIELD_RATE) in
- * both directions. roll / pitch are then solved so that the thrust axis matches the
+ * rotation that puts F on the cone boundary. phi grows immediately and shrinks at
+ * most at PFA_YIELD_RATE. roll / pitch are then solved so that the thrust axis matches the
  * rotated one with the commanded yaw unchanged.
  */
 Vector3f PFAPOSControl::attitude_yield(const Vector3f &force_ned, const Vector3f &euler_des, float dt)
@@ -296,18 +306,23 @@ Vector3f PFAPOSControl::attitude_yield(const Vector3f &force_ned, const Vector3f
 		const Vector3f n = t_d.cross(f_hat);
 		theta = atan2f(n.norm(), t_d.dot(f_hat));	// accurate also near 0 (acosf is not)
 
-		// beyond 90 deg (flip manoeuvres) or degenerate axis: do not interfere
-		valid = (theta < M_PI_2_F);
+		// A force far from the thrust axis (theta > 90 deg) is exactly the case where the
+		// vehicle is being pushed away (e.g. a large commanded tilt): keep yielding. Only a
+		// commanded attitude that is itself beyond 90 deg (flip manoeuvres) is left alone.
+		valid = (t_d(2) < 0.f);
 
 		if (valid && n.norm() > 1e-6f) {
 			_yield_axis = n.normalized();
 		}
 	}
 
+	// Growing the yield is immediate (a commanded tilt step is followed by the attitude
+	// loop within a few 100 ms, a slower yield arrives too late); only the recovery
+	// towards the commanded attitude is rate limited (PFA_YIELD_RATE).
 	const float target = valid ? math::max(theta - sigma, 0.f) : 0.f;
 	const float step = math::radians(_param_yield_rate.get()) * dt;
-	_yield_angle = math::constrain(_yield_angle + math::constrain(target - _yield_angle, -step, step),
-				       0.f, M_PI_2_F);
+	_yield_angle = (target >= _yield_angle) ? target : math::max(target, _yield_angle - step);
+	_yield_angle = math::constrain(_yield_angle, 0.f, M_PI_F);
 
 	if (_yield_angle < 1e-4f) {
 		return euler_des;

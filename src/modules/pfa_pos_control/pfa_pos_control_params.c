@@ -214,10 +214,12 @@ PARAM_DEFINE_INT32(PFA_ATT_YIELD, 1);
 PARAM_DEFINE_FLOAT(PFA_YIELD_TILT, 25.0f);
 
 /**
- * Maximum rate of the attitude yield
+ * Recovery rate of the attitude yield
  *
- * Rate at which the yield angle may grow (when the force leaves the cone) and
- * shrink again (when it returns), so the attitude setpoint changes smoothly.
+ * Rate at which the yield angle shrinks again when the force returns into the
+ * cone, so the attitude setpoint returns smoothly to the commanded attitude.
+ * Growing the yield is immediate (a slower yield arrives after the attitude
+ * has already followed a commanded tilt step).
  *
  * @unit deg/s
  * @min 5.0
