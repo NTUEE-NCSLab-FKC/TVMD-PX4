@@ -338,6 +338,27 @@ param set-default SIM_GZ_SV_FUNC6 206
 param set-default SIM_GZ_SV_FUNC7 207
 param set-default SIM_GZ_SV_FUNC8 208
 
+# Servo scaling: gz_bridge publishes (output - 500) / 500 as the joint position in rad, so the
+# default range 0..1000 turned a full PX4 servo command (+-1 = CA_SV_TL*_MAXA = 30 deg) into
+# +-1 rad (57 deg, then clipped by the +-45 deg joint limit): 1.9x the servo angle PX4 assumes.
+# 500 -+ 262 maps +-1 to +-0.5236 rad = +-30 deg.
+param set-default SIM_GZ_SV_MIN1 238
+param set-default SIM_GZ_SV_MAX1 762
+param set-default SIM_GZ_SV_MIN2 238
+param set-default SIM_GZ_SV_MAX2 762
+param set-default SIM_GZ_SV_MIN3 238
+param set-default SIM_GZ_SV_MAX3 762
+param set-default SIM_GZ_SV_MIN4 238
+param set-default SIM_GZ_SV_MAX4 762
+param set-default SIM_GZ_SV_MIN5 238
+param set-default SIM_GZ_SV_MAX5 762
+param set-default SIM_GZ_SV_MIN6 238
+param set-default SIM_GZ_SV_MAX6 762
+param set-default SIM_GZ_SV_MIN7 238
+param set-default SIM_GZ_SV_MAX7 762
+param set-default SIM_GZ_SV_MIN8 238
+param set-default SIM_GZ_SV_MAX8 762
+
 # param set-default PWM_MAIN_FUNC1 10003
 # param set-default PWM_MAIN_FUNC2 10004
 # param set-default PWM_MAIN_FUNC3 10005
