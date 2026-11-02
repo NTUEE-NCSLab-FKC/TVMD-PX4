@@ -291,7 +291,8 @@ float PFAPOSControl::servo_tilt_max() const
  * Stage 2: if the low-passed full force (incl. position feedback) is still more than the
  * servo range + YIELD_DRIFT_MARGIN_DEG away from that attitude, the vehicle is being pushed
  * away: lean further into the force, capped at MPC_TILTMAX_AIR.
- * Both angles grow immediately and shrink at most at PFA_YIELD_RATE. roll / pitch are
+ * Stage 1 follows the command exactly; the stage-2 angle grows immediately and shrinks at
+ * most at PFA_YIELD_RATE. roll / pitch are
  * then solved so that the thrust axis matches the rotated one with the commanded yaw.
  */
 Vector3f PFAPOSControl::attitude_yield(const Vector3f &force_nominal, const Vector3f &force_ned,
@@ -329,9 +330,9 @@ Vector3f PFAPOSControl::attitude_yield(const Vector3f &force_nominal, const Vect
 		return atan2f(n.norm(), t.dot(f / fn));	// accurate also near 0 (acosf is not)
 	};
 
-	// Growing a yield is immediate (a commanded tilt step is followed by the attitude loop
-	// within a few 100 ms, a slower yield arrives too late); only the recovery towards the
-	// commanded attitude is rate limited (PFA_YIELD_RATE).
+	// Stage 2 only: growing is immediate (a slower yield arrives after the vehicle has already
+	// been pushed away); the recovery towards the stage-1 attitude is rate limited
+	// (PFA_YIELD_RATE), because the low-passed full force can change quickly.
 	const auto update = [&](float &angle, float target) {
 		angle = (target >= angle) ? target : math::max(target, angle - step);
 		angle = math::constrain(angle, 0.f, M_PI_F);
@@ -344,9 +345,13 @@ Vector3f PFAPOSControl::attitude_yield(const Vector3f &force_nominal, const Vect
 	// feedforward) outside the PFA_YIELD_TILT cone. The position feedback is deliberately not
 	// used here: attitude -> position error -> force -> yield -> attitude is a loop, and with the
 	// full force the setpoint swung between ~6 and ~43 deg in SITL (Kp 50 / Kd 25).
+	// No rate limit here: stage 1 depends only on the command and the nominal force, so it is
+	// already as smooth as the command. A rate-limited recovery made a command step-down
+	// (e.g. 52 -> 30 deg, typical when PFA_DES_* arrives late) drop the setpoint to ~0 deg and
+	// ramp back to the cone, i.e. yield far more than needed (SITL log 17_09_35).
 	const float theta1 = valid ? angle_to(t_d, force_nominal, _yield_axis) : 0.f;
-	update(_yield_angle, valid ? math::max(theta1 - math::radians(_param_yield_tilt.get()), 0.f) : 0.f);
-	const float phi1 = valid ? math::min(_yield_angle, theta1) : _yield_angle;	// never past the force
+	_yield_angle = valid ? math::max(theta1 - math::radians(_param_yield_tilt.get()), 0.f) : 0.f;
+	const float phi1 = _yield_angle;	// = theta1 - sigma <= theta1: never past the force
 	const Vector3f t_1 = Dcmf(matrix::AxisAnglef(_yield_axis, phi1)) * t_d;
 
 	// Stage 2 - drift: the (low-passed) full force is far outside even the servo range of the

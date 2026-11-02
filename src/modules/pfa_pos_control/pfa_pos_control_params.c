@@ -220,12 +220,12 @@ PARAM_DEFINE_INT32(PFA_ATT_YIELD, 1);
 PARAM_DEFINE_FLOAT(PFA_YIELD_TILT, 20.0f);
 
 /**
- * Recovery rate of the attitude yield
+ * Recovery rate of the attitude yield (drift stage)
  *
- * Rate at which the yield angle shrinks again when the force returns into the
- * cone, so the attitude setpoint returns smoothly to the commanded attitude.
- * Growing the yield is immediate (a slower yield arrives after the attitude
- * has already followed a commanded tilt step).
+ * Rate at which the drift-stage yield (vehicle pushed away, force beyond the
+ * servo range + 15 deg) shrinks again, so the attitude setpoint returns
+ * smoothly. Growing is immediate. The feasibility stage (commanded tilt outside
+ * the PFA_YIELD_TILT cone) is not rate limited: it follows the command.
  *
  * @unit deg/s
  * @min 5.0
