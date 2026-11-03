@@ -42,6 +42,7 @@
  */
 
 #include <float.h>
+#include <string.h>
 
 #include <drivers/drv_hrt.h>
 #include <lib/geo/geo.h>
@@ -71,6 +72,7 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/debug_vect.h>
 #include <uORB/uORB.h>
 
 // #include "MulticopterPositionControl.hpp"
@@ -79,6 +81,7 @@
 using matrix::Eulerf;
 using matrix::Quatf;
 using matrix::Matrix3f;
+using matrix::Vector2f;
 using matrix::Vector3f;
 using matrix::Dcmf;
 
@@ -142,6 +145,7 @@ private:
 	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription _vcontrol_mode_sub{ORB_ID(vehicle_control_mode)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription _debug_vect_sub{ORB_ID(debug_vect)};	/**< streamed attitude command (DEBUG_VECT "att_cmd") */
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_local_position_sub{this, ORB_ID(vehicle_local_position)};
 
@@ -164,6 +168,16 @@ private:
 	static constexpr float YIELD_FORCE_TAU = 0.3f;	/**< time constant of _yield_force_lp (s) */
 	static constexpr float YIELD_DRIFT_MARGIN_DEG = 15.f;	/**< drift stage: force beyond servo range + this */
 
+	// Streamed roll/pitch command (PFA_ATT_SRC = 1, MAVLink DEBUG_VECT "att_cmd")
+	matrix::Vector2f _stream_att{};		/**< last received roll, pitch (rad) */
+	matrix::Vector2f _stream_rate{};	/**< roll, pitch rate from the last two samples (rad/s) */
+	float _stream_t_send{NAN};		/**< sender time of the last sample (DEBUG_VECT z, s) */
+	hrt_abstime _stream_t_rx{0};		/**< reception time of the last sample */
+	matrix::Vector2f _att_cmd_out{};	/**< roll, pitch command handed to the controller (rad) */
+	bool _att_cmd_init{false};
+	bool _att_cmd_from_stream{false};
+	bool _att_cmd_blending{false};		/**< slewing after a source switch (stream <-> params) */
+
 	float _pos_yaw_sp{0.0f};		/**< yaw setpoint of the position branch (integrated from yawspeed when yaw is NaN) */
 	bool  _pos_yaw_valid{false};
 
@@ -185,6 +199,10 @@ private:
 
 		(ParamFloat<px4::params::PFA_DES_ROLL>)  _param_des_roll,
 		(ParamFloat<px4::params::PFA_DES_PITCH>) _param_des_pitch,
+		(ParamInt<px4::params::PFA_ATT_SRC>)     _param_att_src,
+		(ParamFloat<px4::params::PFA_ATT_TOUT>)  _param_att_tout,
+		(ParamFloat<px4::params::PFA_ATT_EXTR>)  _param_att_extr,
+		(ParamFloat<px4::params::PFA_ATT_SLEW>)  _param_att_slew,
 
 		(ParamInt<px4::params::PFA_TKF_BYP>)    _param_takeoff_bypass,
 		(ParamInt<px4::params::PFA_VERT_PRIO>)  _param_vert_prio,
@@ -230,6 +248,12 @@ private:
 			const vehicle_local_position_s &vlocal_pos);
 
 	float position_yaw_setpoint(const trajectory_setpoint_s &traj_sp, const float dt);
+
+	/**
+	 * Desired roll and pitch (rad): PFA_DES_ROLL/PITCH, or the streamed DEBUG_VECT
+	 * "att_cmd" extrapolated with its rate while fresh (PFA_ATT_SRC = 1).
+	 */
+	matrix::Vector2f desired_roll_pitch(hrt_abstime now, float dt);
 
 	/**
 	 * Rotate the commanded attitude towards the desired force so that the force

@@ -452,6 +452,88 @@ float PFAPOSControl::position_yaw_setpoint(const trajectory_setpoint_s &traj_sp,
 }
 
 /**
+ * Desired roll and pitch.
+ *
+ * PFA_ATT_SRC = 0: PFA_DES_ROLL / PFA_DES_PITCH (unchanged behaviour).
+ * PFA_ATT_SRC = 1: MAVLink DEBUG_VECT named "att_cmd" with x = roll (deg), y = pitch (deg),
+ *   z = sender time of the sample (s). DEBUG_VECT has only three fields, so the rate is the
+ *   difference of the last two samples over their sender times: arrival jitter does not
+ *   enter, and a lost packet just makes the difference span two periods. Between packets
+ *   the command is extrapolated, theta = theta_k + rate * age, with age capped at
+ *   PFA_ATT_EXTR, so link holds no longer freeze the command into a staircase. Without a
+ *   new sample for PFA_ATT_TOUT the parameters take over again.
+ * Each switch between stream and parameters slews at PFA_ATT_SLEW until the command has
+ * caught up, so a lost link or a late start does not step the attitude.
+ */
+matrix::Vector2f PFAPOSControl::desired_roll_pitch(const hrt_abstime now, const float dt)
+{
+	const float timeout = math::max(_param_att_tout.get(), 0.05f);
+	debug_vect_s dv;
+
+	if (_debug_vect_sub.update(&dv)
+	    && (strncmp(dv.name, "att_cmd", sizeof(dv.name)) == 0)
+	    && PX4_ISFINITE(dv.x) && PX4_ISFINITE(dv.y) && PX4_ISFINITE(dv.z)) {
+
+		const Vector2f att(math::radians(math::constrain(dv.x, -90.f, 90.f)),
+				   math::radians(math::constrain(dv.y, -90.f, 90.f)));
+		const float dt_send = dv.z - _stream_t_send;	// NaN for the first sample
+		const bool prev_fresh = (_stream_t_rx != 0) && ((dv.timestamp - _stream_t_rx) * 1e-6f < timeout);
+
+		if (prev_fresh && (dt_send > 1e-3f) && (dt_send < timeout)) {
+			_stream_rate = (att - _stream_att) / dt_send;
+
+		} else {
+			// first sample, restarted sender clock or a long gap: no rate information
+			_stream_rate.setZero();
+		}
+
+		_stream_att = att;
+		_stream_t_send = dv.z;
+		_stream_t_rx = dv.timestamp;
+	}
+
+	const float age = (_stream_t_rx != 0 && now > _stream_t_rx) ? (now - _stream_t_rx) * 1e-6f : 0.f;
+	const bool from_stream = (_param_att_src.get() == 1) && (_stream_t_rx != 0) && (age < timeout);
+
+	Vector2f target(math::radians(_param_des_roll.get()), math::radians(_param_des_pitch.get()));
+
+	if (from_stream) {
+		target = _stream_att + _stream_rate * math::constrain(age, 0.f, _param_att_extr.get());
+		target(0) = math::constrain(target(0), -M_PI_2_F, M_PI_2_F);
+		target(1) = math::constrain(target(1), -M_PI_2_F, M_PI_2_F);
+	}
+
+	if (!_att_cmd_init) {
+		// (re)start in flight: begin from the parameters so a stale stream sample is not stepped to
+		_att_cmd_out = Vector2f(math::radians(_param_des_roll.get()), math::radians(_param_des_pitch.get()));
+		_att_cmd_from_stream = false;
+		_att_cmd_blending = true;
+		_att_cmd_init = true;
+	}
+
+	if (from_stream != _att_cmd_from_stream) {
+		_att_cmd_from_stream = from_stream;
+		_att_cmd_blending = true;
+	}
+
+	if (_att_cmd_blending) {
+		const float step = math::radians(math::max(_param_att_slew.get(), 1.f)) * dt;
+		const Vector2f diff = target - _att_cmd_out;
+		_att_cmd_out(0) += math::constrain(diff(0), -step, step);
+		_att_cmd_out(1) += math::constrain(diff(1), -step, step);
+
+		if (Vector2f(target - _att_cmd_out).norm() < math::radians(0.1f)) {
+			_att_cmd_blending = false;
+		}
+
+	} else {
+		_att_cmd_out = target;
+	}
+
+	return _att_cmd_out;
+}
+
+/**
  * Hold setpoint: latch position and heading when Hold is entered, follow EKF resets.
  */
 void PFAPOSControl::update_hold_setpoint(const bool hold_mode, const vehicle_local_position_s &vlocal_pos)
@@ -674,6 +756,7 @@ void PFAPOSControl::Run()
 
 			if (!flying) {
 				_pos_yaw_valid = false;
+				_att_cmd_init = false;
 			}
 			const bool ramping_up = (_takeoff.getTakeoffState() == TakeoffState::rampup);
 			// const bool flying_but_ground_contact = (flying && _vehicle_land_detected.ground_contact);
@@ -683,7 +766,8 @@ void PFAPOSControl::Run()
 				// const Vector3f attitude_des = Vector3f(0.0f, 0.0f, _trajectory_setpoint.yaw); // roll and pitch = 0, yaw from trajectory setpoint
 				// const Vector3f attitude_des = Vector3f(_manual_control_setpoint.roll, _manual_control_setpoint.pitch, _manual_control_setpoint.yaw); // roll and pitch from manual, yaw from trajectory setpoint
 				const float yaw_sp = position_yaw_setpoint(traj_sp, dt);
-				const Vector3f attitude_des = Vector3f(math::radians(_param_des_roll.get()), math::radians(_param_des_pitch.get()), yaw_sp);
+				const Vector2f roll_pitch_des = desired_roll_pitch(hrt_absolute_time(), dt);
+				const Vector3f attitude_des = Vector3f(roll_pitch_des(0), roll_pitch_des(1), yaw_sp);
 
 				if (ramping_up) {
 					// Reset position setpoint to current xy-position at the hovering height

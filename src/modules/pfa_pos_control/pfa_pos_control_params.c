@@ -235,3 +235,66 @@ PARAM_DEFINE_FLOAT(PFA_YIELD_TILT, 20.0f);
  * @group PFA Position Control
  */
 PARAM_DEFINE_FLOAT(PFA_YIELD_RATE, 45.0f);
+
+/**
+ * Source of the desired roll and pitch
+ *
+ * 0: PFA_DES_ROLL / PFA_DES_PITCH.
+ * 1: MAVLink DEBUG_VECT named "att_cmd" (x = roll deg, y = pitch deg, z = sender
+ * time of the sample in s), extrapolated with the rate of the last two samples.
+ * Falls back to PFA_DES_ROLL / PFA_DES_PITCH when no sample arrived for
+ * PFA_ATT_TOUT. The attitude yield and all force limits apply to both sources.
+ *
+ * @value 0 Parameters
+ * @value 1 DEBUG_VECT stream
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_INT32(PFA_ATT_SRC, 0);
+
+/**
+ * Timeout of the streamed attitude command
+ *
+ * Without a new DEBUG_VECT "att_cmd" sample for this time, the desired roll and
+ * pitch slew back to PFA_DES_ROLL / PFA_DES_PITCH at PFA_ATT_SLEW.
+ *
+ * @unit s
+ * @min 0.05
+ * @max 2.0
+ * @decimal 2
+ * @increment 0.05
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_FLOAT(PFA_ATT_TOUT, 0.5f);
+
+/**
+ * Extrapolation horizon of the streamed attitude command
+ *
+ * Between samples the command continues with the rate of the last two samples
+ * for at most this time, then holds. 0 disables the extrapolation (sample and
+ * hold).
+ *
+ * @unit s
+ * @min 0.0
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.05
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_FLOAT(PFA_ATT_EXTR, 0.3f);
+
+/**
+ * Slew rate when switching the attitude command source
+ *
+ * Applied on every switch between the DEBUG_VECT stream and the parameters
+ * (stream start, timeout, PFA_ATT_SRC change) until the command has caught up.
+ * Must be larger than the peak rate of the streamed waveform, otherwise the
+ * command only catches up at a turning point.
+ *
+ * @unit deg/s
+ * @min 5.0
+ * @max 360.0
+ * @decimal 1
+ * @increment 5.0
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_FLOAT(PFA_ATT_SLEW, 60.0f);
