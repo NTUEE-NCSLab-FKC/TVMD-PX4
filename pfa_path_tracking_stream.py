@@ -70,7 +70,7 @@ LEAD_OUT_S           = SPEED_RAMP_S   # 擺動結束到停止 (s)
 MAX_AMP_DEG       = 60.0   # 振幅硬上限 (deg)
 
 CMD_HZ            = 30.0   # DEBUG_VECT "att_cmd" 送出頻率 (Hz)；SITL 可 50，57600 數傳建議 ≤ 30
-CMD_LEAD_S        = 0.0    # 指令提前量 (s)；姿態迴路延遲約 0.4 s，可試 0.3–0.4
+CMD_LEAD_S        = 0.4    # 指令提前量 (s)：補償姿態迴路約 0.4 s 的延遲（SITL 實測 0.37–0.42 s）；0 = 不補償
 # 韌體串流參數；None = 不改 FCU 目前的值
 ATT_TOUT_S        = None   # PFA_ATT_TOUT (s，預設 0.5)
 ATT_EXTR_S        = None   # PFA_ATT_EXTR (s，預設 0.3)
