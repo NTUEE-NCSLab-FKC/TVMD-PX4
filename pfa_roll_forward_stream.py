@@ -25,6 +25,15 @@ pfa_roll_forward.py 的串流版：直線前進，roll 以 ±ROLL_AMP_DEG 正弦
   姿態讓步（PFA_YIELD_TILT）仍然有效：超出可行範圍的角度會被限制，位置與高度優先。
   CMD_LEAD_S > 0 時送 t + CMD_LEAD_S 的指令，補償姿態迴路約 0.4 s 的延遲。
 
+■ 姿態偏差補償（BIAS_*）
+  指令 0° 懸停時實測姿態有穩態偏差 b（SITL 14_38_27：roll ≈ +1.0°、pitch ≈ +2.4°；
+  重心 / 力矩干擾，姿態迴路沒有積分）。開始前進前先以 0° 懸停 BIAS_MEASURE_S 秒量測
+  平均偏差 b，之後串流送出
+    送出值(t) = 參考軌跡(t + CMD_LEAD_S) − b
+  讓「實測」姿態以真正的 0° 為中心擺動。量完後先送 −b 懸停 BIAS_SETTLE_S 秒，
+  印出補償後的殘差再開始前進；終點懸停期間也維持 −b，降落前才關串流。
+  補償只移動指令，干擾力矩仍在，兩側可用的舵機角度不對稱。統計的誤差是 參考 − 實測。
+
 ■ 前進軌跡（NED，以起飛點正上方為起點）
   沿 PATH_YAW_DEG 方向直線前進，速度 v(t) 在前後 SPEED_RAMP_S 以 smoothstep 加減速，
   中段等速 PATH_SPEED_MPS；送 位置 + 速度 + 加速度 前饋，yaw 固定 PATH_YAW_DEG。
@@ -75,6 +84,12 @@ ATT_EXTR_S        = None   # PFA_ATT_EXTR (s，預設 0.3)
 ATT_SLEW_DPS      = None   # PFA_ATT_SLEW (deg/s，預設 60)
 
 HOVER_BEFORE_S    = 5.0    # 開始前的水平懸停時間 (s)
+
+# 姿態偏差補償：送出值 = 參考 − 偏差 b（b = 指令 0° 懸停時的實測平均姿態）
+BIAS_COMP         = True   # False = 不補償
+BIAS_MEASURE_S    = 5.0    # 量測時間 (s)：PFA_DES_ROLL/PITCH = 0°、無串流時懸停，取實測平均
+BIAS_MAX_DEG      = 8.0    # 偏差上限 (deg)：超過視為異常，補償量限制在 ±BIAS_MAX_DEG
+BIAS_SETTLE_S     = 3.0    # 送 −b 後等待姿態穩定、再驗證殘差的時間 (s)
 HOLD_END_S        = 5.0    # 結束後在終點的懸停時間 (s)
 ALT_TOL           = 0.15   # 高度穩定容許誤差 (m)
 HOVER_STABLE_TIME = 3.0    # 高度在容許範圍內需持續的時間 (s)
@@ -362,10 +377,13 @@ def param_get_int(name: str, timeout: float = 3.0):
     return None if v is None else struct.unpack('<i', struct.pack('<f', v))[0]
 
 
-def send_att_cmd(t_sample: float, roll_deg: float, pitch_deg: float):
+_stream_t0 = time.time()   # DEBUG_VECT z 的時間基準（整個串流共用一個時鐘，角速度才連續）
+
+
+def send_att_cmd(roll_deg: float, pitch_deg: float):
     """DEBUG_VECT "att_cmd"：x = roll°、y = pitch°、z = 取樣時間 (s，韌體用來算角速度)。"""
     _send(master.mav.debug_vect_send, b'att_cmd', int(time.time() * 1e6),
-          float(roll_deg), float(pitch_deg), float(t_sample))
+          float(roll_deg), float(pitch_deg), float(time.time() - _stream_t0))
 
 
 def attitude_stream_off():
@@ -438,6 +456,32 @@ def hold(p, yaw, duration):
     while time.time() - t_w < duration:
         check_flight()
         time.sleep(0.05)
+
+
+def sample_attitude(duration: float):
+    """取樣 duration 秒的實測 roll / pitch (deg)，並維持飛行檢查。
+    回傳 (roll 平均, pitch 平均, roll σ, pitch σ)。"""
+    rs, ps = [], []
+    end = time.time() + duration
+    while time.time() < end:
+        check_flight()
+        rs.append(math.degrees(_att['roll']))
+        ps.append(math.degrees(_att['pitch']))
+        time.sleep(0.05)
+    mr, mp = sum(rs) / len(rs), sum(ps) / len(ps)
+    sr = math.sqrt(sum((v - mr) ** 2 for v in rs) / len(rs))
+    sp = math.sqrt(sum((v - mp) ** 2 for v in ps) / len(ps))
+    return mr, mp, sr, sp
+
+
+def stream_hold(p, yaw, roll_deg, pitch_deg, duration):
+    """在 p 懸停，同時以 CMD_HZ 串流固定姿態指令（例如 −偏差）。"""
+    set_pva(p, yaw=yaw)
+    end = time.time() + duration
+    while time.time() < end:
+        check_flight()
+        send_att_cmd(roll_deg, pitch_deg)
+        time.sleep(1.0 / CMD_HZ)
 
 
 def servo_max_deg():
@@ -608,17 +652,46 @@ try:
     print(f"\n[Step 4] Level hover for {HOVER_BEFORE_S:.0f} s...")
     hold(hover_p, path_yaw, HOVER_BEFORE_S)
 
+    bias_r = bias_p = 0.0
+    if BIAS_COMP:
+        print(f"\n[Step 4b] Measuring attitude bias for {BIAS_MEASURE_S:.0f} s (command 0°, no stream)...")
+        mr, mp, sr, sp = sample_attitude(BIAS_MEASURE_S)
+        print(f"  measured roll {mr:+.1f}° (σ {sr:.1f}°)   pitch {mp:+.1f}° (σ {sp:.1f}°)")
+        bias_r = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mr))
+        bias_p = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mp))
+        if (bias_r, bias_p) != (mr, mp):
+            print(f"  WARNING: bias exceeds ±{BIAS_MAX_DEG:.0f}° → clipped to roll {bias_r:+.1f}°, "
+                  f"pitch {bias_p:+.1f}°（請檢查重心 / 電纜）")
+        print(f"\n[Step 4c] Bias compensation: stream roll {-bias_r:+.1f}°, pitch {-bias_p:+.1f}° "
+              f"for {BIAS_SETTLE_S:.0f} s")
+        stream_on = True
+        _stream_t0 = time.time()
+        stream_hold(hover_p, path_yaw, -bias_r, -bias_p, max(0.0, BIAS_SETTLE_S - 2.0) + 0.5)
+        cr, cp = 0.0, 0.0
+        t_v = time.time()
+        rs, ps = [], []
+        while time.time() - t_v < 2.0:
+            check_flight()
+            send_att_cmd(-bias_r, -bias_p)
+            rs.append(math.degrees(_att['roll'])); ps.append(math.degrees(_att['pitch']))
+            time.sleep(1.0 / CMD_HZ)
+        cr, cp = sum(rs) / len(rs), sum(ps) / len(ps)
+        print(f"  after compensation: roll {cr:+.1f}°  pitch {cp:+.1f}°  (目標 0°)")
+
     # ─────────────────────────────────────────────────────────
     # Step 5 – 直線前進 + 姿態串流
     # ─────────────────────────────────────────────────────────
     cdir, sdir = math.cos(path_yaw), math.sin(path_yaw)
     print(f"\n[Step 5] {RUN_S:.0f} s forward + attitude stream (DEBUG_VECT)")
-    print(f"  {'t':>5}  {'seg':<6} {'roll c/sp/m':>17}  {'pitch c/sp/m':>17}  "
-          f"{'s_cmd':>5} {'along':>6} {'cross':>6} {'alt':>5} {'servo':>5}")
+    print(f"  {'t':>5}  {'seg':<6} {'roll r/sp/m':>17}  {'pitch r/sp/m':>17}  "
+          f"{'s_cmd':>5} {'along':>6} {'cross':>6} {'alt':>5} {'servo':>5}"
+          f"   (r = 參考(t)，送出 r(t + {CMD_LEAD_S:.2f} s) − b，b = ({bias_r:+.1f}°, {bias_p:+.1f}°))")
     stats = {}        # segment → dict of lists
     n_sent = 0
     cmd_dt = 1.0 / CMD_HZ
     t0 = time.time()
+    if not stream_on:
+        _stream_t0 = t0
     stream_on = True
     last_print = 0.0
     next_tick = 0.0
@@ -631,9 +704,9 @@ try:
         p = (hover_p[0] + s_ * cdir, hover_p[1] + s_ * sdir, -TARGET_ALT_M)
         set_pva(p, (v_ * cdir, v_ * sdir, 0.0), (a_ * cdir, a_ * sdir, 0.0), path_yaw)
 
-        # z = 取樣時間 t；值 = t + CMD_LEAD_S 的指令（韌體以 Δ值/Δz 算角速度，兩者一致）
+        # 值 = 參考(t + CMD_LEAD_S) − 偏差；z = 串流時鐘（韌體以 Δ值/Δz 算角速度，兩者一致）
         r_lead, p_lead, _ = attitude_cmd_deg(t + CMD_LEAD_S)
-        send_att_cmd(t, r_lead, p_lead)
+        send_att_cmd(r_lead - bias_r, p_lead - bias_p)
         n_sent += 1
 
         r_c, p_c, seg = attitude_cmd_deg(t)
@@ -665,17 +738,11 @@ try:
     elapsed = time.time() - t0
     end_p = (hover_p[0] + PATH_LEN_M * cdir, hover_p[1] + PATH_LEN_M * sdir, -TARGET_ALT_M)
     set_pva(end_p, yaw=path_yaw)
-    # 再送 0.5 s 的 0°（rate = 0），讓韌體停在 0 而不是外插，之後才關串流
-    for _ in range(int(0.5 * CMD_HZ)):
-        send_att_cmd(time.time() - t0, 0.0, 0.0)
-        time.sleep(cmd_dt)
     print(f"\n  DEBUG_VECT: {n_sent} sent in {elapsed:.1f} s (≈ {n_sent / max(elapsed, 1e-3):.1f} Hz), "
           f"setpoint max gap {_sp_stat['max_gap']*1000:.0f} ms")
-    attitude_stream_off()
-    stream_on = False
 
     for seg, st in stats.items():
-        print(f"  [{seg}] cmd−meas: roll RMS {_rms(st['er']):.1f}° pitch RMS {_rms(st['ep']):.1f}°  |  "
+        print(f"  [{seg}] ref−meas: roll RMS {_rms(st['er']):.1f}° pitch RMS {_rms(st['ep']):.1f}°  |  "
               f"sp−meas: roll {_rms(st['esr']):.1f}° pitch {_rms(st['esp']):.1f}°  |  "
               f"sp tilt max {max(st['tilt_sp']):.1f}°")
         print(f"  [{seg}] cross-track RMS {_rms(st['cross']):.2f} m (max {max(map(abs, st['cross'])):.2f})  "
@@ -684,8 +751,11 @@ try:
     # ─────────────────────────────────────────────────────────
     # Step 6 – 終點懸停
     # ─────────────────────────────────────────────────────────
-    print(f"\n[Step 6] Holding end point for {HOLD_END_S:.0f} s...")
-    hold(end_p, path_yaw, HOLD_END_S)
+    # 終點懸停：串流維持 −偏差（rate = 0，韌體停在補償值而不是外插），降落前才關串流
+    print(f"\n[Step 6] Holding end point for {HOLD_END_S:.0f} s (stream {-bias_r:+.1f}°, {-bias_p:+.1f}°)...")
+    stream_hold(end_p, path_yaw, -bias_r, -bias_p, HOLD_END_S)
+    attitude_stream_off()
+    stream_on = False
 
 except Aborted as e:
     print(f"\n  ✗ Aborted: {e} → 不再切換模式，交給飛手 / failsafe。")
@@ -697,8 +767,9 @@ except KeyboardInterrupt:
     end_p = (_ned['x'], _ned['y'], -TARGET_ALT_M)
     set_pva(end_p, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
     if stream_on:
+        b_r, b_p = globals().get('bias_r', 0.0), globals().get('bias_p', 0.0)
         for _ in range(int(0.3 * CMD_HZ)):
-            send_att_cmd(time.time(), 0.0, 0.0)
+            send_att_cmd(-b_r, -b_p)
             time.sleep(1.0 / CMD_HZ)
         attitude_stream_off()
     time.sleep(2.0)

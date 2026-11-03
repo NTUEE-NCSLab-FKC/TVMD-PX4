@@ -31,6 +31,15 @@ MAVLink DEBUG_VECT "att_cmd"，由 pfa_pos_control 以角速度外插成連續�
   結束時印出「剩餘延遲」與建議的 CMD_LEAD_S；延遲會隨振幅 / 週期 / 增益改變。
   CMD_LEAD_S = 0 即不補償。
 
+■ 姿態偏差補償（BIAS_*）
+  指令 0° 懸停時實測姿態有穩態偏差 b（SITL 14_38_27：roll ≈ +1.0°、pitch ≈ +2.4°；
+  重心 / 力矩干擾，姿態迴路沒有積分）。擺動前先以 0° 懸停 BIAS_MEASURE_S 秒量測
+  平均偏差 b，之後串流送出
+    送出值(t) = 參考軌跡(t + CMD_LEAD_S) − b
+  讓「實測」姿態以真正的 0° 為中心擺動。量完後先送 −b 懸停 BIAS_SETTLE_S 秒並印出
+  殘差；擺動結束後的懸停也維持 −b，降落前才關串流。補償只移動指令，干擾力矩仍在，
+  兩側可用的舵機角度不對稱。統計的誤差是 參考 − 實測。
+
 ■ 量測
   ATTITUDE（實際姿態）與 ATTITUDE_TARGET（pfa_pos_control 發布、姿態讓步之後的
   setpoint）各 10 Hz。結束時統計：指令 − 實際、setpoint − 實際、合成傾角。
@@ -83,6 +92,12 @@ ATT_EXTR_S        = None   # PFA_ATT_EXTR：外插最長時間 (s，預設 0.3)
 ATT_SLEW_DPS      = None   # PFA_ATT_SLEW：切換來源時的漸變速率 (deg/s，預設 60)
 
 HOVER_BEFORE_S    = 5.0    # 開始擺動前的懸停時間 (s)
+
+# 姿態偏差補償：送出值 = 參考 − 偏差 b（b = 指令 0° 懸停時的實測平均姿態）
+BIAS_COMP         = True   # False = 不補償
+BIAS_MEASURE_S    = 5.0    # 量測時間 (s)：PFA_DES_ROLL/PITCH = 0°、無串流時懸停，取實測平均
+BIAS_MAX_DEG      = 8.0    # 偏差上限 (deg)：超過視為異常，補償量限制在 ±BIAS_MAX_DEG
+BIAS_SETTLE_S     = 3.0    # 送 −b 後等待姿態穩定、再驗證殘差的時間 (s)
 HOVER_AFTER_S     = 5.0    # 擺動結束、姿態歸零後的懸停時間 (s)
 ALT_TOL           = 0.25   # 高度穩定容許誤差 (m)
 HOVER_STABLE_TIME = 2.0    # 高度在容許範圍內需持續的時間 (s)
@@ -326,10 +341,30 @@ def param_set(name: str, value: float, retries: int = 5, timeout: float = 1.5) -
     return False
 
 
-def send_att_cmd(t_sample: float, roll_deg: float, pitch_deg: float):
+_stream_t0 = time.time()   # DEBUG_VECT z 的時間基準（整個串流共用一個時鐘，角速度才連續）
+
+
+def send_att_cmd(roll_deg: float, pitch_deg: float):
     """DEBUG_VECT "att_cmd"：x = roll°、y = pitch°、z = 取樣時間 (s，韌體用來算角速度)。"""
     _send(master.mav.debug_vect_send, b'att_cmd', int(time.time() * 1e6),
-          float(roll_deg), float(pitch_deg), float(t_sample))
+          float(roll_deg), float(pitch_deg), float(time.time() - _stream_t0))
+
+
+def sample_attitude(duration: float, stream=None):
+    """取樣 duration 秒的實測 roll / pitch (deg)；stream = (roll°, pitch°) 時同時以 CMD_HZ 串流。
+    回傳 (roll 平均, pitch 平均, roll σ, pitch σ)。"""
+    rs, ps = [], []
+    end = time.time() + duration
+    while time.time() < end:
+        if stream is not None:
+            send_att_cmd(*stream)
+        rs.append(math.degrees(_att['roll']))
+        ps.append(math.degrees(_att['pitch']))
+        time.sleep(1.0 / CMD_HZ if stream is not None else 0.05)
+    mr, mp = sum(rs) / len(rs), sum(ps) / len(ps)
+    sr = math.sqrt(sum((v - mr) ** 2 for v in rs) / len(rs))
+    sp = math.sqrt(sum((v - mp) ** 2 for v in ps) / len(ps))
+    return mr, mp, sr, sp
 
 
 def param_set_int(name: str, value: int, retries: int = 5, timeout: float = 1.5) -> bool:
@@ -592,13 +627,30 @@ while True:
 print(f"\n[Step 4] Level hover for {HOVER_BEFORE_S:.0f} s...")
 time.sleep(HOVER_BEFORE_S)
 
+bias_r = bias_p = 0.0
+if BIAS_COMP:
+    print(f"\n[Step 4b] Measuring attitude bias for {BIAS_MEASURE_S:.0f} s (command 0°, no stream)...")
+    mr, mp, sr, sp = sample_attitude(BIAS_MEASURE_S)
+    print(f"  measured roll {mr:+.1f}° (σ {sr:.1f}°)   pitch {mp:+.1f}° (σ {sp:.1f}°)")
+    bias_r = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mr))
+    bias_p = max(-BIAS_MAX_DEG, min(BIAS_MAX_DEG, mp))
+    if (bias_r, bias_p) != (mr, mp):
+        print(f"  WARNING: bias exceeds ±{BIAS_MAX_DEG:.0f}° → clipped to roll {bias_r:+.1f}°, "
+              f"pitch {bias_p:+.1f}°（請檢查重心 / 電纜）")
+    print(f"\n[Step 4c] Bias compensation: stream roll {-bias_r:+.1f}°, pitch {-bias_p:+.1f}° "
+          f"for {BIAS_SETTLE_S:.0f} s")
+    _stream_t0 = time.time()
+    sample_attitude(max(0.0, BIAS_SETTLE_S - 2.0) + 0.5, stream=(-bias_r, -bias_p))
+    cr, cp, _, _ = sample_attitude(2.0, stream=(-bias_r, -bias_p))
+    print(f"  after compensation: roll {cr:+.1f}°  pitch {cp:+.1f}°  (目標 0°)")
+
 # ─────────────────────────────────────────────────────────────
 # Step 5 – roll + pitch 錐形追蹤（DEBUG_VECT @ CMD_HZ）
 # ─────────────────────────────────────────────────────────────
 print(f"\n[Step 5] Roll/pitch cone tracking for {_TOTAL_S:.0f} s (DEBUG_VECT)")
 print(f"  {'t':>5}  {'env':>4}  {'roll_ref':>8} {'sp':>6} {'roll':>6}  "
       f"{'pitch_ref':>9} {'sp':>6} {'pitch':>6}  {'alt':>5}  {'xy_err':>6}  {'servo':>5}"
-      f"   (ref = 參考軌跡(t)；送出的是 ref(t + {CMD_LEAD_S:.2f} s))")
+      f"   (ref = 參考軌跡(t)；送出 ref(t + {CMD_LEAD_S:.2f} s) − b，b = ({bias_r:+.1f}°, {bias_p:+.1f}°))")
 
 n_sent     = 0
 err_r, err_p, err_xy = [], [], []      # 指令 − 實際
@@ -611,6 +663,8 @@ elapsed    = 0.0
 
 try:
     t0         = time.time()
+    if not BIAS_COMP:
+        _stream_t0 = t0
     last_print = 0.0
     next_tick  = 0.0
     while True:
@@ -624,9 +678,9 @@ try:
             aborted = True
             break
 
-        # z = 取樣時間 t；值 = t + CMD_LEAD_S 的指令（韌體以 Δ值/Δz 算角速度，兩者一致）
+        # 值 = 參考(t + CMD_LEAD_S) − 偏差；z = 串流時鐘（韌體以 Δ值/Δz 算角速度，兩者一致）
         roll_c, pitch_c = attitude_cmd_deg(min(t + CMD_LEAD_S, _TOTAL_S))
-        send_att_cmd(t, roll_c, pitch_c)
+        send_att_cmd(roll_c - bias_r, pitch_c - bias_p)
         n_sent += 1
 
         roll_now, pitch_now = attitude_cmd_deg(t)   # 參考軌跡(t)：實測姿態要對齊的目標
@@ -663,10 +717,9 @@ try:
             next_tick = time.time() - t0   # 落後就不補送，從現在重新排程
     elapsed = time.time() - t0
     if not aborted:
-        # 包絡已回到 0：再送 0.5 s 的 0°（rate = 0），讓韌體停在 0 而不是外插
-        for _ in range(int(0.5 * CMD_HZ)):
-            send_att_cmd(time.time() - t0, 0.0, 0.0)
-            time.sleep(cmd_dt)
+        # 包絡已回到 0：懸停 HOVER_AFTER_S，串流維持 −偏差（rate = 0，韌體停在補償值而不是外插）
+        print(f"\n[Step 6] Level hover for {HOVER_AFTER_S:.0f} s (stream {-bias_r:+.1f}°, {-bias_p:+.1f}°)...")
+        sample_attitude(HOVER_AFTER_S, stream=(-bias_r, -bias_p))
 finally:
     print("  PFA_ATT_SRC → 0, PFA_DES_ROLL/PITCH → 0°")
     att_src_off()
@@ -717,11 +770,8 @@ if aborted:
     shutdown(1)
 
 # ─────────────────────────────────────────────────────────────
-# Step 6 – 水平懸停 → 降落
+# 降落（Step 6 的水平懸停已在串流關閉前完成）
 # ─────────────────────────────────────────────────────────────
-print(f"\n[Step 6] Level hover for {HOVER_AFTER_S:.0f} s...")
-time.sleep(HOVER_AFTER_S)
-
 print("\n[Land] Landing (AUTO.LAND)...")
 set_mode_land()
 # 確認已離開 OFFBOARD 才停止 setpoint，否則會先觸發 offboard lost → Position mode
