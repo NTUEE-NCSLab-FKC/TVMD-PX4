@@ -21,7 +21,15 @@ MAVLink DEBUG_VECT "att_cmd"，由 pfa_pos_control 以角速度外插成連續�
   算出（用送出端時間，到達時間的抖動不影響；掉一包只是跨兩個週期），
   兩筆之間外插 θ = θ_k + rate · age（age ≤ PFA_ATT_EXTR），數傳停頓時指令不會卡住。
   超過 PFA_ATT_TOUT 沒收到新值 → 以 PFA_ATT_SLEW 漸變回 PFA_DES_ROLL/PITCH（= 0）。
-  CMD_LEAD_S > 0 時送出 t + CMD_LEAD_S 的指令，用來補償數傳延遲。
+
+■ 延遲補償（CMD_LEAD_S）
+  SITL（12_57_28 / 13_05_51）實測姿態比 setpoint 落後 0.37–0.42 s，扣掉延遲後誤差只剩
+  1.5–3°；延遲主要來自姿態迴路（P/D、沒有角速度前饋），不是數傳。腳本送出
+    送出值(t) = 參考軌跡(t + CMD_LEAD_S)
+  對單一頻率的正弦 / 錐形擺動等於把相位提前 ω·CMD_LEAD_S，讓實測姿態對齊參考軌跡(t)。
+  DEBUG_VECT 的 z 仍是取樣時間 t（韌體以 Δ值/Δz 算角速度，與提前量無關）。
+  結束時印出「剩餘延遲」與建議的 CMD_LEAD_S；延遲會隨振幅 / 週期 / 增益改變。
+  CMD_LEAD_S = 0 即不補償。
 
 ■ 量測
   ATTITUDE（實際姿態）與 ATTITUDE_TARGET（pfa_pos_control 發布、姿態讓步之後的
@@ -58,12 +66,12 @@ CONNECTION        = sys.argv[1] if len(sys.argv) > 1 else 'udp:127.0.0.1:14550'
 
 TARGET_ALT_M      = 1.0    # 懸停高度 (m)；光流 SENS_FLOW_MINHGT = 0.8 m，建議 ≥ 1.0
 
-ROLL_AMP_DEG      = 0.0   # roll 振幅 (deg)，正值 = 右翼朝下
-PITCH_AMP_DEG     = 60.0   # pitch 振幅 (deg)，正值 = 機頭朝上
-SINE_PERIOD_S     = 12   # 正弦週期 (s)；峰值角速度 = 2π·A/T（20°, 10 s → 12.6°/s）
+ROLL_AMP_DEG      = 20.0   # roll 振幅 (deg)，正值 = 右翼朝下
+PITCH_AMP_DEG     = 20.0   # pitch 振幅 (deg)，正值 = 機頭朝上
+SINE_PERIOD_S     = 4   # 正弦週期 (s)；峰值角速度 = 2π·A/T（20°, 10 s → 12.6°/s）
 CONE_CCW          = True   # True: 俯視逆時針（後→右→前→左）; False: 順時針
 PITCH_PHASE_DEG   = 90.0 if CONE_CCW else -90.0   # pitch 相對 roll 的相位 (deg)
-NUM_CYCLES        = 5      # 滿振幅的完整週期數
+NUM_CYCLES        = 4      # 滿振幅的完整週期數
 ENV_RAMP_S        = SINE_PERIOD_S   # 振幅包絡淡入 / 淡出時間 (s)
 MAX_AMP_DEG       = 60.0   # 振幅硬上限 (deg)
 
@@ -582,17 +590,21 @@ while True:
     time.sleep(0.05)
 
 print(f"\n[Step 4] Level hover for {HOVER_BEFORE_S:.0f} s...")
+time.sleep(HOVER_BEFORE_S)
+
 # ─────────────────────────────────────────────────────────────
 # Step 5 – roll + pitch 錐形追蹤（DEBUG_VECT @ CMD_HZ）
 # ─────────────────────────────────────────────────────────────
 print(f"\n[Step 5] Roll/pitch cone tracking for {_TOTAL_S:.0f} s (DEBUG_VECT)")
-print(f"  {'t':>5}  {'env':>4}  {'roll_cmd':>8} {'sp':>6} {'roll':>6}  "
-      f"{'pitch_cmd':>9} {'sp':>6} {'pitch':>6}  {'alt':>5}  {'xy_err':>6}  {'servo':>5}")
+print(f"  {'t':>5}  {'env':>4}  {'roll_ref':>8} {'sp':>6} {'roll':>6}  "
+      f"{'pitch_ref':>9} {'sp':>6} {'pitch':>6}  {'alt':>5}  {'xy_err':>6}  {'servo':>5}"
+      f"   (ref = 參考軌跡(t)；送出的是 ref(t + {CMD_LEAD_S:.2f} s))")
 
 n_sent     = 0
 err_r, err_p, err_xy = [], [], []      # 指令 − 實際
 err_sr, err_sp = [], []                # setpoint（讓步後）− 實際
 tilt_cmd, tilt_sp, tilt_meas = [], [], []   # 合成傾角 (deg)
+lag_log    = []                        # (t, roll_meas, pitch_meas)：估計剩餘延遲
 aborted    = False
 cmd_dt     = 1.0 / CMD_HZ
 elapsed    = 0.0
@@ -617,7 +629,7 @@ try:
         send_att_cmd(t, roll_c, pitch_c)
         n_sent += 1
 
-        roll_now, pitch_now = attitude_cmd_deg(t)   # 統計用：目前時刻的指令
+        roll_now, pitch_now = attitude_cmd_deg(t)   # 參考軌跡(t)：實測姿態要對齊的目標
         sp_r    = math.degrees(_att_sp['roll'])
         sp_p    = math.degrees(_att_sp['pitch'])
         roll_m  = math.degrees(_att['roll'])
@@ -632,6 +644,7 @@ try:
             tilt_cmd.append(tilt_deg(roll_now, pitch_now))
             tilt_sp.append(tilt_deg(sp_r, sp_p))
             tilt_meas.append(tilt_deg(roll_m, pitch_m))
+            lag_log.append((t, roll_m, pitch_m))
 
         now = time.time()
         if now - last_print >= LOG_PERIOD_S:
@@ -666,8 +679,29 @@ def _rms(x):
     return math.sqrt(sum(v * v for v in x) / len(x)) if x else float('nan')
 
 
+def _residual_lag(log):
+    """實測相對參考軌跡的剩餘延遲 τ (s)：使 Σ(ref(t − τ) − meas(t))² 最小，τ ∈ [−1, 1] s。
+    τ > 0：仍落後 → CMD_LEAD_S 加大 τ；τ < 0：超前 → 減少。回傳 (τ, 扣掉 τ 後的 RMS°)。"""
+    if len(log) < 20:
+        return None
+    best = None
+    for k in range(-100, 101):
+        tau = k * 0.01
+        e = 0.0
+        for t, rm, pm in log:
+            rr, pr = attitude_cmd_deg(t - tau)
+            e += (rr - rm) ** 2 + (pr - pm) ** 2
+        if best is None or e < best[1]:
+            best = (tau, e)
+    return best[0], math.sqrt(best[1] / len(log) / 2.0)
+
+
 if err_r:
-    print(f"  Full-amplitude phase (cmd − meas): roll RMS {_rms(err_r):.1f}° (max {max(map(abs, err_r)):.1f}°)  "
+    _lag = _residual_lag(lag_log)
+    if _lag is not None:
+        print(f"  Residual lag vs reference: {_lag[0]:+.2f} s (RMS {_lag[1]:.1f}° after removing it) "
+              f"→ suggested CMD_LEAD_S ≈ {max(0.0, CMD_LEAD_S + _lag[0]):.2f} s")
+    print(f"  Full-amplitude phase (ref − meas): roll RMS {_rms(err_r):.1f}° (max {max(map(abs, err_r)):.1f}°)  "
           f"pitch RMS {_rms(err_p):.1f}° (max {max(map(abs, err_p)):.1f}°)")
     print(f"  Full-amplitude phase (sp − meas):  roll RMS {_rms(err_sr):.1f}° (max {max(map(abs, err_sr)):.1f}°)  "
           f"pitch RMS {_rms(err_sp):.1f}° (max {max(map(abs, err_sp)):.1f}°)")
