@@ -385,6 +385,16 @@ def send_att_cmd(roll_deg: float, pitch_deg: float):
     _send(master.mav.debug_vect_send, b'att_cmd', int(time.time() * 1e6),
           float(roll_deg), float(pitch_deg), float(time.time() - _stream_t0))
 
+def send_att_meta(b_roll: float, b_pitch: float):
+    """DEBUG_VECT "att_meta"：x = 偏差 b_roll°、y = b_pitch°、z = CMD_LEAD_S (s)。
+    韌體不使用，只給 log：事後由 att_cmd 還原 ref(z + lead) = (x, y) + b。
+    在 att_cmd 串流開始前送（debug_vect 是單一 topic，同時送會漏記），送 5 次。"""
+    for _ in range(5):
+        _send(master.mav.debug_vect_send, b'att_meta', int(time.time() * 1e6),
+              float(b_roll), float(b_pitch), float(CMD_LEAD_S))
+        time.sleep(0.1)
+
+
 
 def attitude_stream_off():
     """PFA_ATT_SRC = 0、PFA_DES_ROLL/PITCH = 0（等 ACK，setpoint 照常送出）。"""
@@ -542,6 +552,12 @@ if not param_set_int('PFA_ATT_SRC', 1):
     print("  ERROR: PFA_ATT_SRC = 1 設定失敗。")
     shutdown(1)
 print("  PFA_ATT_SRC = 1 ... OK")
+_sdlog = param_get('SDLOG_PROFILE')
+if _sdlog is not None:
+    _sdlog = struct.unpack('<i', struct.pack('<f', _sdlog))[0]
+    if not (_sdlog & 32):
+        print(f"  NOTE: SDLOG_PROFILE = {_sdlog} 不含 32（Debug topics）→ debug_vect 不會被記錄，"
+              f"事後無法還原參考姿態 ref(t)；改成 {_sdlog | 32} 並重開機")
 _slew = param_get('PFA_ATT_SLEW')
 _tilt = param_get('PFA_YIELD_TILT')
 if _slew is not None and _slew <= ATT_PEAK_RATE_DPS:
@@ -662,6 +678,7 @@ try:
         if (bias_r, bias_p) != (mr, mp):
             print(f"  WARNING: bias exceeds ±{BIAS_MAX_DEG:.0f}° → clipped to roll {bias_r:+.1f}°, "
                   f"pitch {bias_p:+.1f}°（請檢查重心 / 電纜）")
+        send_att_meta(bias_r, bias_p)          # 給 log：還原 ref(t) 用
         print(f"\n[Step 4c] Bias compensation: stream roll {-bias_r:+.1f}°, pitch {-bias_p:+.1f}° "
               f"for {BIAS_SETTLE_S:.0f} s")
         stream_on = True
@@ -689,6 +706,8 @@ try:
     stats = {}        # segment → dict of lists
     n_sent = 0
     cmd_dt = 1.0 / CMD_HZ
+    if not stream_on:
+        send_att_meta(0.0, 0.0)
     t0 = time.time()
     if not stream_on:
         _stream_t0 = t0
