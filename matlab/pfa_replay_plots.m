@@ -13,6 +13,8 @@
 %    6  角加速度 d(omega)/dt              13  XY 平面軌跡（顏色 = 時間）
 %    7  力 F、力矩 M：控制器要求 vs 分配後 vs 由推力器重建
 %                                         14  XYZ 三維軌跡（顏色 = 時間）
+%   15  推力器推力方向俯視投影（4 格依機身位置排列，顏色 = 時間）
+%  軌跡與投影都畫成連續線，顏色沿線隨時間變化（jet 色階）。
 %
 %  座標換算（PX4 NED/FRD -> ROS ENU/FLU）：
 %    p_ENU = (E, N, -D)；v_FLU = (x, -y, -z)（角速度、力、力矩）
@@ -276,7 +278,7 @@ end
 fig = newFig('trajectory_xy', FIG_W * 0.75, FIG_W * 0.65); ax = axes(fig); hold(ax, 'on');
 ok = all(isfinite(p_sp(:,1:2)), 2);
 plot(ax, p_sp(ok,1), p_sp(ok,2), 'k--', 'LineWidth', 0.9, 'DisplayName', 'setpoint');
-scatter(ax, p(:,1), p(:,2), 6, t_lp, 'filled', 'DisplayName', 'actual');
+colorLine(ax, p(:,1), p(:,2), [], t_lp, 1.6, 'actual');
 plot(ax, p(1,1), p(1,2), 'o', 'Color', [0 0.6 0], 'MarkerSize', 8, 'LineWidth', 1.5, 'DisplayName', 'start');
 plot(ax, p(end,1), p(end,2), 's', 'Color', [0.8 0 0], 'MarkerSize', 8, 'LineWidth', 1.5, 'DisplayName', 'end');
 colormap(ax, CMAP); cb = colorbar(ax); cb.Label.String = '$t$ [s]'; cb.Label.Interpreter = 'latex';
@@ -287,13 +289,41 @@ title(ax, '$XY$ Trajectory'); legend(ax, 'Location', 'best');
 fig = newFig('trajectory_xyz', FIG_W * 0.8, FIG_W * 0.65); ax = axes(fig); hold(ax, 'on');
 ok = all(isfinite(p_sp), 2);
 plot3(ax, p_sp(ok,1), p_sp(ok,2), p_sp(ok,3), 'k--', 'LineWidth', 0.9, 'DisplayName', 'setpoint');
-scatter3(ax, p(:,1), p(:,2), p(:,3), 6, t_lp, 'filled', 'DisplayName', 'actual');
+colorLine(ax, p(:,1), p(:,2), p(:,3), t_lp, 1.6, 'actual');
 plot3(ax, p(1,1), p(1,2), p(1,3), 'o', 'Color', [0 0.6 0], 'MarkerSize', 8, 'LineWidth', 1.5, 'DisplayName', 'start');
 plot3(ax, p(end,1), p(end,2), p(end,3), 's', 'Color', [0.8 0 0], 'MarkerSize', 8, 'LineWidth', 1.5, 'DisplayName', 'end');
 colormap(ax, CMAP); cb = colorbar(ax); cb.Label.String = '$t$ [s]'; cb.Label.Interpreter = 'latex';
 axis(ax, 'equal'); grid(ax, 'on'); view(ax, 45, 30);
 xlabel(ax, '$x$ (East) [m]'); ylabel(ax, '$y$ (North) [m]'); zlabel(ax, '$z$ (Up) [m]');
 title(ax, '$XYZ$ Trajectory'); legend(ax, 'Location', 'best');
+
+%% ── 圖 15：推力器推力方向俯視投影（顏色 = 時間）────────────────────────
+% 推力方向單位向量的俯視投影（機頭朝上）：
+%   橫軸 = 往右的分量 sin(eta_x)（= -y_FLU），縱軸 = 往前的分量 cos(eta_x) sin(eta_y)（= x_FLU）
+% 外框 = sin(svMax)（單軸舵機極限），虛線框 = sin(15 deg)；點在中心 = 推力垂直機身
+if hasAct
+    fig = newFig('thruster_direction', FIG_W, FIG_W * 0.9);
+    tl = tiledlayout(fig, 2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+    E  = sind(svMax);  E15 = sind(15);
+    for i = 1:4                                     % 依機身位置：左前、右前、左後、右後
+        ax = nexttile(tl, i); hold(ax, 'on');
+        rgt = sin(ex(:,i));                         % 往右
+        fwd = cos(ex(:,i)) .* sin(ey(:,i));         % 往前
+        rectangle(ax, 'Position', [-E -E 2*E 2*E], 'EdgeColor', [0.4 0.4 0.4], 'LineWidth', 0.8);
+        rectangle(ax, 'Position', [-E15 -E15 2*E15 2*E15], 'EdgeColor', [0.6 0.6 0.6], 'LineStyle', '--');
+        plot(ax, [-E E], [0 0], ':', 'Color', [0.5 0.5 0.5]); plot(ax, [0 0], [-E E], ':', 'Color', [0.5 0.5 0.5]);
+        colorLine(ax, rgt, fwd, [], t_sv, 1.2, '');
+        plot(ax, mean(rgt), mean(fwd), 'k+', 'MarkerSize', 10, 'LineWidth', 1.5);   % 平均方向
+        axis(ax, 'equal'); xlim(ax, [-1.1 1.1] * E); ylim(ax, [-1.1 1.1] * E);
+        colormap(ax, CMAP); clim(ax, [min(t_sv) max(t_sv)]);
+        title(ax, sprintf('%s: mean $\\eta_x$ %+.1f$^\\circ$, $\\eta_y$ %+.1f$^\\circ$', ...
+            MOD_NAME{i}, mean(etaX(:,i)), mean(etaY(:,i))));
+        if i >= 3, xlabel(ax, 'right $\sin\eta_x$'); end
+        if mod(i, 2) == 1, ylabel(ax, 'forward $\cos\eta_x\sin\eta_y$'); end
+    end
+    cb = colorbar(ax); cb.Layout.Tile = 'east'; cb.Label.String = '$t$ [s]'; cb.Label.Interpreter = 'latex';
+    title(tl, 'Thrust Direction, Top View (nose up)', 'Interpreter', 'latex');
+end
 
 %% ── 匯出 ─────────────────────────────────────────────────────────────────
 if EXPORT_PDF
@@ -357,6 +387,18 @@ function shadeSpans(ax, spans, on)
         xregion(ax, spans(k,1), spans(k,2), 'FaceColor', [0.5 0.5 0.5], 'FaceAlpha', 0.08, ...
             'HandleVisibility', 'off');
     end
+end
+
+function h = colorLine(ax, x, y, z, c, lw, name)
+% 連續線，顏色沿線依 c（時間）變化：patch 的 EdgeColor = 'interp'
+    x = x(:); y = y(:); c = c(:);
+    if isempty(z), z = zeros(size(x)); end
+    z = z(:);
+    ok = isfinite(x) & isfinite(y) & isfinite(z) & isfinite(c);
+    x(~ok) = NaN; y(~ok) = NaN; z(~ok) = NaN;      % 斷點保持斷開
+    h = patch(ax, [x; NaN], [y; NaN], [z; NaN], [c; NaN], ...
+        'EdgeColor', 'interp', 'FaceColor', 'none', 'LineWidth', lw);
+    if isempty(name), h.HandleVisibility = 'off'; else, h.DisplayName = name; end
 end
 
 function fig = newFig(name, w, h)
