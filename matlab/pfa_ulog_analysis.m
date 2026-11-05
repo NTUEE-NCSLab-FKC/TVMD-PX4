@@ -1,5 +1,5 @@
-%% PFA / TVMD ULog analysis (MATLAB R2020b+ with UAV Toolbox)
-% 直接讀 .ulg（ulogreader），畫出：
+%% PFA / TVMD ULog analysis (MATLAB R2023a+；不需工具箱，xregion 需 R2023a)
+% 直接讀 .ulg（同資料夾的 pfa_ulogread.m），畫出：
 %   1. 姿態：setpoint（姿態讓步之後）vs 實際
 %   2. 位置：俯視軌跡、位置誤差換到機頭方向座標（往前 / 往右）
 %   3. 舵機 η_x / η_y（每個推力器）與馬達推力
@@ -18,20 +18,17 @@ thrustA   = 1.17;          % 推力模型 f = A + B·u (N)
 thrustB   = 7.845;
 
 %% ── 讀檔 ────────────────────────────────────────────────────────────────
-ulog = ulogreader(logFile);
-t0   = ulog.StartTime;
-tsec = @(tt) seconds(tt.Properties.RowTimes - t0);
-
+% 用 pfa_ulogread（純 MATLAB，不需工具箱）：UAV Toolbox R2023a 的 ulogreader
+% 讀這版 PX4 的 log 會出錯（Colon operands must be in the range of the data type）
 topics = {'vehicle_attitude','vehicle_attitude_setpoint','vehicle_local_position', ...
           'trajectory_setpoint','actuator_servos','actuator_motors', ...
           'vehicle_thrust_setpoint','vehicle_status'};
-avail  = ulog.AvailableTopics.TopicNames;
-topics = topics(ismember(topics, avail));
-msgs   = readTopicMsgs(ulog, 'TopicNames', topics, 'InstanceID', num2cell(zeros(1, numel(topics))));
-getT   = @(name) msgs.TopicMessages{strcmp(msgs.TopicNames, name)};
+L      = pfa_ulogread(logFile, topics);
+topics = topics(isfield(L.topic, topics));
+tsec   = @(T) T.t;                         % s，相對第一筆 vehicle_status
+getT   = @(name) L.topic.(name);
 
-P = readParameters(ulog);
-par = @(name, def) paramOr(P, name, def);
+par   = @(name, def) paramOr(L.params, name, def);
 Fmax  = par('PFA_MAX_THR', 36.06);
 mass  = par('PFA_VEH_MASS', 1.5);
 svMax = par('CA_SV_TL0_MAXA', 30);
@@ -50,16 +47,16 @@ end
 %% ── 共同時間軸：vehicle_local_position ─────────────────────────────────
 N  = lp.x;  E = lp.y;  D = lp.z;
 yawL   = interpAngle(ta, yaw, tl);
-rollL  = interp1(ta, roll,  tl, 'previous', 'extrap');
-pitchL = interp1(ta, pitch, tl, 'previous', 'extrap');
+rollL  = interpPrev(ta, roll,  tl, 'extrap');
+pitchL = interpPrev(ta, pitch, tl, 'extrap');
 
 hasTraj = any(strcmp(topics, 'trajectory_setpoint'));
 if hasTraj
     tr  = getT('trajectory_setpoint'); ttr = tsec(tr);
     pos = col(tr, 'position', 3);
-    spN = interp1(ttr, pos(:,1), tl, 'previous', NaN);
-    spE = interp1(ttr, pos(:,2), tl, 'previous', NaN);
-    spD = interp1(ttr, pos(:,3), tl, 'previous', NaN);
+    spN = interpPrev(ttr, pos(:,1), tl, NaN);
+    spE = interpPrev(ttr, pos(:,2), tl, NaN);
+    spD = interpPrev(ttr, pos(:,3), tl, NaN);
     % 位置誤差（實際 − setpoint）換到機頭方向座標
     dN = N - spN;  dE = E - spE;
     errFwd   =  dN .* cos(yawL) + dE .* sin(yawL);
@@ -170,11 +167,13 @@ end
 
 %% ── helpers ─────────────────────────────────────────────────────────────
 function v = paramOr(P, name, def)
-    k = find(strcmp(string(P.Parameters), name), 1);
-    if isempty(k), v = def; return; end
-    val = P.Values(k);
-    if iscell(val), val = val{1}; end
-    v = double(val);
+    if isfield(P, name), v = P.(name); else, v = def; end
+end
+
+function vi = interpPrev(t, v, ti, fill)
+% 前一筆取值（zero-order hold）；ULog 可能有重複時間戳，先去重
+    [t, ia] = unique(t, 'last');
+    vi = interp1(t, v(ia, :), ti, 'previous', fill);
 end
 
 function M = col(tt, name, n)
@@ -201,11 +200,12 @@ function [r, p, y] = quatToEuler(q)          % q = [w x y z]，PX4 ZYX Euler (ra
 end
 
 function a = interpAngle(t, ang, ti)
-    a = atan2(interp1(t, sin(ang), ti, 'previous', 'extrap'), interp1(t, cos(ang), ti, 'previous', 'extrap'));
+    a = atan2(interpPrev(t, sin(ang), ti, 'extrap'), interpPrev(t, cos(ang), ti, 'extrap'));
 end
 
 function qi = interpQuat(t, q, ti)            % 取最近的前一筆（足夠密）
-    idx = interp1(t, (1:numel(t))', ti, 'previous', 'extrap');
+    idx = interpPrev(t, (1:numel(t))', ti, 'extrap');
+    idx(isnan(idx)) = 1;
     idx = max(1, min(numel(t), round(idx)));
     qi  = q(idx, :);
 end
