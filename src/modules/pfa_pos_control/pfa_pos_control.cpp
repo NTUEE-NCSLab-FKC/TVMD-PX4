@@ -438,9 +438,11 @@ void PFAPOSControl::stabilization_controller_6dof(
  * sample rate. Here the position is carried forward with the velocity and
  * acceleration of the same sample,
  *   p(now) = p_sp + v_sp * age + 0.5 * a_sp * age^2,  age = now - t_sp,
+ * and the velocity likewise, v(now) = v_sp + a_sp * age (a held velocity
+ * lags an accelerating vehicle: sawtooth of m * Kv * a * dt, SITL fig-8),
  * with age capped at PFA_SP_EXTR so a lost link only moves the target a short
- * distance before it holds. Axes with a NaN position (velocity control) are
- * left as they are; NaN velocity / acceleration count as zero.
+ * distance before it holds. NaN components stay NaN; NaN acceleration counts
+ * as zero.
  */
 void PFAPOSControl::extrapolate_setpoint(trajectory_setpoint_s &sp, const hrt_abstime now)
 {
@@ -453,13 +455,21 @@ void PFAPOSControl::extrapolate_setpoint(trajectory_setpoint_s &sp, const hrt_ab
 	const float age = math::min((now - sp.timestamp) * 1e-6f, age_max);
 
 	for (int i = 0; i < 3; i++) {
-		if (!PX4_ISFINITE(sp.position[i])) {
-			continue;
-		}
-
-		const float v = PX4_ISFINITE(sp.velocity[i]) ? sp.velocity[i] : 0.f;
 		const float a = PX4_ISFINITE(sp.acceleration[i]) ? sp.acceleration[i] : 0.f;
-		sp.position[i] += v * age + 0.5f * a * age * age;
+
+		if (PX4_ISFINITE(sp.velocity[i])) {
+			// velocity first-order hold as well: a held velocity setpoint lags the
+			// accelerating vehicle and the velocity gain answers with a sawtooth
+			// of m * Kv * a * dt at the sample rate
+			if (PX4_ISFINITE(sp.position[i])) {
+				sp.position[i] += sp.velocity[i] * age + 0.5f * a * age * age;
+			}
+
+			sp.velocity[i] += a * age;
+
+		} else if (PX4_ISFINITE(sp.position[i])) {
+			sp.position[i] += 0.5f * a * age * age;
+		}
 	}
 }
 
