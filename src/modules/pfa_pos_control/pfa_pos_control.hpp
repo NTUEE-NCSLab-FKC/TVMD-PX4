@@ -203,6 +203,7 @@ private:
 		(ParamFloat<px4::params::PFA_ATT_TOUT>)  _param_att_tout,
 		(ParamFloat<px4::params::PFA_ATT_EXTR>)  _param_att_extr,
 		(ParamFloat<px4::params::PFA_ATT_SLEW>)  _param_att_slew,
+		(ParamFloat<px4::params::PFA_SP_EXTR>)   _param_sp_extr,
 
 		(ParamInt<px4::params::PFA_TKF_BYP>)    _param_takeoff_bypass,
 		(ParamInt<px4::params::PFA_VERT_PRIO>)  _param_vert_prio,
@@ -248,6 +249,7 @@ private:
 			const vehicle_local_position_s &vlocal_pos);
 
 	float position_yaw_setpoint(const trajectory_setpoint_s &traj_sp, const float dt);
+	void extrapolate_setpoint(trajectory_setpoint_s &sp, const hrt_abstime now);
 
 	/**
 	 * Desired roll and pitch (rad): PFA_DES_ROLL/PITCH, or the streamed DEBUG_VECT

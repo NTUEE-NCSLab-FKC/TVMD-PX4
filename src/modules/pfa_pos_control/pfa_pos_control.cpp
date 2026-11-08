@@ -427,6 +427,42 @@ void PFAPOSControl::stabilization_controller_6dof(
  *   moved; before, the target fell back to the current yaw and the stick had no effect)
  * - both NaN: current yaw, i.e. yaw is not controlled (unchanged behaviour)
  */
+/**
+ * Setpoint extrapolation (first-order hold)
+ *
+ * External setpoints (offboard over a telemetry link) arrive at 5-10 Hz and
+ * irregularly. Holding the last position between samples turns a moving
+ * reference into a staircase: at 1 m/s each sample jumps the position target
+ * 0.1-0.2 m, the position gain answers with a force pulse, the vehicle passes
+ * the frozen target and brakes, and the loop rocks back and forth at the
+ * sample rate. Here the position is carried forward with the velocity and
+ * acceleration of the same sample,
+ *   p(now) = p_sp + v_sp * age + 0.5 * a_sp * age^2,  age = now - t_sp,
+ * with age capped at PFA_SP_EXTR so a lost link only moves the target a short
+ * distance before it holds. Axes with a NaN position (velocity control) are
+ * left as they are; NaN velocity / acceleration count as zero.
+ */
+void PFAPOSControl::extrapolate_setpoint(trajectory_setpoint_s &sp, const hrt_abstime now)
+{
+	const float age_max = _param_sp_extr.get();
+
+	if (age_max <= 0.f || sp.timestamp == 0 || now <= sp.timestamp) {
+		return;
+	}
+
+	const float age = math::min((now - sp.timestamp) * 1e-6f, age_max);
+
+	for (int i = 0; i < 3; i++) {
+		if (!PX4_ISFINITE(sp.position[i])) {
+			continue;
+		}
+
+		const float v = PX4_ISFINITE(sp.velocity[i]) ? sp.velocity[i] : 0.f;
+		const float a = PX4_ISFINITE(sp.acceleration[i]) ? sp.acceleration[i] : 0.f;
+		sp.position[i] += v * age + 0.5f * a * age * age;
+	}
+}
+
 float PFAPOSControl::position_yaw_setpoint(const trajectory_setpoint_s &traj_sp, const float dt)
 {
 	const float yaw_now = Eulerf(Quatf(_vehicle_attitude.q))(2);
@@ -737,7 +773,11 @@ void PFAPOSControl::Run()
 		if (position_control_mode
 		    && (hold_mode || (_trajectory_setpoint.timestamp >= _time_position_control_enabled))) {
 			// position mode / altitude mode / offboard / auto modes
-			const trajectory_setpoint_s &traj_sp = hold_mode ? _hold_setpoint : _trajectory_setpoint;
+			trajectory_setpoint_s traj_sp = hold_mode ? _hold_setpoint : _trajectory_setpoint;
+
+			if (!hold_mode) {
+				extrapolate_setpoint(traj_sp, hrt_absolute_time());
+			}
 
 			_vehicle_constraints_sub.update(&_vehicle_constraints);
 

@@ -298,3 +298,22 @@ PARAM_DEFINE_FLOAT(PFA_ATT_EXTR, 0.3f);
  * @group PFA Position Control
  */
 PARAM_DEFINE_FLOAT(PFA_ATT_SLEW, 60.0f);
+
+/**
+ * Position setpoint extrapolation limit
+ *
+ * Offboard setpoints arrive at a few Hz over a telemetry link. Between two
+ * samples the position target is carried forward with the sample's velocity
+ * and acceleration (p + v*age + a*age^2/2) for at most this time, then held.
+ * Removes the position staircase that makes the vehicle surge and brake at
+ * the setpoint rate when it tracks a moving reference. 0 disables it (sample
+ * and hold). Not applied in Hold mode.
+ *
+ * @unit s
+ * @min 0.0
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.05
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_FLOAT(PFA_SP_EXTR, 0.3f);
