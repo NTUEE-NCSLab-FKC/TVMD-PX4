@@ -318,3 +318,38 @@ PARAM_DEFINE_FLOAT(PFA_ATT_SLEW, 60.0f);
  * @group PFA Position Control
  */
 PARAM_DEFINE_FLOAT(PFA_SP_EXTR, 0.3f);
+
+/**
+ * Velocity feedback notch frequency
+ *
+ * Centre frequency of a notch filter applied to the measured horizontal
+ * velocity used by the velocity (D) feedback of the position controller.
+ * Removes the velocity feedback around this frequency only (e.g. the ~2.3 Hz
+ * fore-aft oscillation in forward flight) without lowering PFA_GAIN_X/Y_D.
+ * The velocity setpoint, the acceleration feedforward and the vertical axis
+ * are not filtered. 0 disables the filter.
+ *
+ * @unit Hz
+ * @min 0.0
+ * @max 20.0
+ * @decimal 2
+ * @increment 0.1
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_FLOAT(PFA_VEL_NF_FRQ, 0.0f);
+
+/**
+ * Velocity feedback notch bandwidth
+ *
+ * Width of the notch set by PFA_VEL_NF_FRQ (e.g. 1.0 Hz around 2.3 Hz removes
+ * roughly 1.8-2.8 Hz). Wider removes more but adds more phase change to the
+ * neighbouring frequencies. Only used when PFA_VEL_NF_FRQ > 0.
+ *
+ * @unit Hz
+ * @min 0.1
+ * @max 10.0
+ * @decimal 2
+ * @increment 0.1
+ * @group PFA Position Control
+ */
+PARAM_DEFINE_FLOAT(PFA_VEL_NF_BW, 1.0f);

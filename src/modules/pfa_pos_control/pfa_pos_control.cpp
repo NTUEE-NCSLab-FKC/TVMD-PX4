@@ -170,7 +170,7 @@ void PFAPOSControl::pose_controller_6dof(
 
 	// Calculate errors
 	const Vector3f err_pos = _zeroNonFinite(Vector3f(traj_des.position) - pos);
-	const Vector3f err_vel = _zeroNonFinite(limited_vel_des - vel);
+	const Vector3f err_vel = _zeroNonFinite(limited_vel_des - velocity_feedback(vel));
 	const Vector3f err_acc = _zeroNonFinite(Vector3f(traj_des.acceleration));
 
 	// NED frame (north east down)
@@ -274,6 +274,78 @@ void PFAPOSControl::pose_controller_6dof(
 	_local_pos_sp_pub.publish(local_pos_sp);
 }
 
+
+/**
+ * Notch filter on the horizontal velocity feedback.
+ *
+ * In forward flight the body x force shows a ~2.3 Hz oscillation that the
+ * velocity (D) term amplifies; lowering PFA_GAIN_X/Y_D removes it but costs
+ * damping everywhere. The notch only removes the velocity feedback around
+ * PFA_VEL_NF_FRQ: the velocity setpoint and the acceleration feedforward are
+ * not filtered (no tracking lag), the vertical axis is not filtered, and the
+ * damping at the position-loop frequencies (< ~1.5 Hz) is kept.
+ * PFA_VEL_NF_FRQ = 0 (or an invalid frequency/bandwidth) disables it.
+ *
+ * The controller runs on vehicle_local_position updates, so the sample rate is
+ * estimated from dt and the coefficients are recomputed when the rate drifts by
+ * more than 10 % or the parameters change.
+ */
+void PFAPOSControl::update_vel_notch(float dt)
+{
+	if (dt > 0.f) {
+		const float rate = 1.f / dt;
+		_loop_rate_hz = (_loop_rate_hz > 0.f) ? (0.98f * _loop_rate_hz + 0.02f * rate) : rate;
+	}
+
+	const float frq = _param_vel_nf_frq.get();
+	const float bw = _param_vel_nf_bw.get();
+
+	if (frq <= 0.f || bw <= 0.f || _loop_rate_hz <= 0.f) {
+		if (_vel_notch_active) {
+			_vel_notch.reset();
+			_vel_notch_active = false;
+		}
+
+		_vel_notch_frq = 0.f;
+		return;
+	}
+
+	const bool params_changed = fabsf(frq - _vel_notch_frq) > FLT_EPSILON || fabsf(bw - _vel_notch_bw) > FLT_EPSILON;
+	const bool rate_changed = fabsf(_loop_rate_hz - _vel_notch_fs) > 0.1f * _vel_notch_fs;
+
+	if (params_changed || rate_changed || !_vel_notch_active) {
+		const bool ok = _vel_notch.setParameters(_loop_rate_hz, frq, bw);
+
+		if (!_vel_notch_active || !ok) {
+			_vel_notch.reset();	// re-initialise from the next sample (no step)
+		}
+
+		_vel_notch_active = ok;
+		_vel_notch_fs = _loop_rate_hz;
+		_vel_notch_frq = frq;
+		_vel_notch_bw = bw;
+	}
+}
+
+Vector3f PFAPOSControl::velocity_feedback(const Vector3f &vel)
+{
+	if (!_vel_notch_active || !vel.isAllFinite()) {
+		return vel;
+	}
+
+	// the 6-DoF controller does not run on the ground / in other modes: restart the
+	// filter from the current velocity instead of continuing from a stale state
+	const hrt_abstime now = hrt_absolute_time();
+
+	if (now - _vel_notch_last > 100_ms) {
+		_vel_notch.reset(vel);
+	}
+
+	_vel_notch_last = now;
+
+	const Vector3f filtered = _vel_notch.apply(vel);
+	return Vector3f(filtered(0), filtered(1), vel(2));	// horizontal only
+}
 
 float PFAPOSControl::servo_tilt_max() const
 {
@@ -652,6 +724,7 @@ void PFAPOSControl::Run()
 			math::constrain(((vlocal_pos.timestamp_sample - _time_stamp_last_loop) * 1e-6f), 0.002f, 0.04f);
 		_time_stamp_last_loop = vlocal_pos.timestamp_sample;
 		_dt = dt;
+		update_vel_notch(dt);
 
 		_vehicle_attitude_sub.update(&_vehicle_attitude);
 		_trajectory_setpoint_sub.update(&_trajectory_setpoint);

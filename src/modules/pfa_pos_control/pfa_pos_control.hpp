@@ -47,6 +47,7 @@
 #include <drivers/drv_hrt.h>
 #include <lib/geo/geo.h>
 #include <lib/mathlib/mathlib.h>
+#include <lib/mathlib/math/filter/NotchFilter.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/pid/pid.h>
 #include <matrix/math.hpp>
@@ -159,6 +160,15 @@ private:
 	bool  _manual_yaw_initialized{false};
 
 	float _dt{0.004f};			/**< loop interval of the current cycle (s) */
+
+	// Notch filter on the horizontal velocity feedback (PFA_VEL_NF_FRQ / PFA_VEL_NF_BW)
+	math::NotchFilter<matrix::Vector3f> _vel_notch;
+	bool _vel_notch_active{false};		/**< filter configured with valid parameters */
+	float _loop_rate_hz{0.f};		/**< low-passed controller loop rate (Hz) */
+	float _vel_notch_fs{0.f};		/**< loop rate the coefficients were computed for */
+	float _vel_notch_frq{0.f};		/**< parameters the coefficients were computed for */
+	float _vel_notch_bw{0.f};
+	hrt_abstime _vel_notch_last{0};		/**< last time the filter was applied */
 	float _yield_angle{0.0f};		/**< attitude yield currently applied (rad, rate limited) */
 	matrix::Vector3f _yield_axis{1.0f, 0.0f, 0.0f};	/**< last valid yield rotation axis (NED) */
 	float _yield_angle2{0.0f};		/**< drift-stage yield currently applied (rad) */
@@ -204,6 +214,8 @@ private:
 		(ParamFloat<px4::params::PFA_ATT_EXTR>)  _param_att_extr,
 		(ParamFloat<px4::params::PFA_ATT_SLEW>)  _param_att_slew,
 		(ParamFloat<px4::params::PFA_SP_EXTR>)   _param_sp_extr,
+		(ParamFloat<px4::params::PFA_VEL_NF_FRQ>) _param_vel_nf_frq,
+		(ParamFloat<px4::params::PFA_VEL_NF_BW>)  _param_vel_nf_bw,
 
 		(ParamInt<px4::params::PFA_TKF_BYP>)    _param_takeoff_bypass,
 		(ParamInt<px4::params::PFA_VERT_PRIO>)  _param_vert_prio,
@@ -250,6 +262,8 @@ private:
 
 	float position_yaw_setpoint(const trajectory_setpoint_s &traj_sp, const float dt);
 	void extrapolate_setpoint(trajectory_setpoint_s &sp, const hrt_abstime now);
+	void update_vel_notch(float dt);
+	matrix::Vector3f velocity_feedback(const matrix::Vector3f &vel);
 
 	/**
 	 * Desired roll and pitch (rad): PFA_DES_ROLL/PITCH, or the streamed DEBUG_VECT
